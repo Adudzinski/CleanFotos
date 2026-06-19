@@ -8,36 +8,55 @@ class PhotoGroup {
   final String? location;
   final double similarityScore; // 0.0 – 1.0
 
+  /// Total size in bytes of all assets in the group (computed at load time).
+  final int sizeBytes;
+
   PhotoGroup({
     required this.id,
     required this.assets,
     required this.groupDate,
     this.location,
     this.similarityScore = 1.0,
+    this.sizeBytes = 0,
   });
 
   int get totalCount => assets.length;
 
-  /// Size in bytes, summed across all assets.
-  Future<int> get totalSizeBytes async {
-    int total = 0;
-    for (final a in assets) {
-      final file = await a.file;
-      if (file != null) {
-        total += await file.length();
-      }
-    }
-    return total;
+  /// Bytes the user would reclaim by keeping just one photo from this group.
+  /// Photos in a group are near-identical, so an average-per-photo estimate is
+  /// accurate enough for a motivational label.
+  int get savingsBytes {
+    if (assets.length <= 1 || sizeBytes <= 0) return 0;
+    return (sizeBytes * (assets.length - 1) / assets.length).round();
   }
 
+  String get sizeFormatted => formatBytes(sizeBytes);
+  String get savingsFormatted => formatBytes(savingsBytes);
+
   PhotoGroup copyWith({List<AssetEntity>? assets}) {
+    final newAssets = assets ?? this.assets;
+    // Scale the cached size proportionally when assets are removed.
+    final scaledSize = this.assets.isEmpty
+        ? 0
+        : (sizeBytes * newAssets.length / this.assets.length).round();
     return PhotoGroup(
       id: id,
-      assets: assets ?? this.assets,
+      assets: newAssets,
       groupDate: groupDate,
       location: location,
       similarityScore: similarityScore,
+      sizeBytes: scaledSize,
     );
+  }
+
+  /// Shared byte formatter (KB/MB/GB).
+  static String formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }
 

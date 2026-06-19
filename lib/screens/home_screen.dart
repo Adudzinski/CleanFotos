@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen>
             Expanded(
               child: _buildBody(context, provider, s),
             ),
-            if (provider.showAds)
+            if (provider.adsEnabled)
               const SafeArea(top: false, child: BannerAdWidget()),
           ],
         ),
@@ -66,10 +66,14 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// Returns from a cleanup mode, refreshes, and shows an interstitial.
+  /// Called when returning from a cleanup mode.
+  ///
+  /// We do NOT re-run the full analysis here — deletions already update the
+  /// groups live, so re-scanning would just show a loading screen and lose the
+  /// user's place. We only show a quick interstitial. (The user can still pull
+  /// "Refresh" for a fresh scan.)
   void _afterMode(AppProvider provider) {
-    provider.loadPhotos();
-    if (provider.showAds) AdService.instance.showInterstitial();
+    if (provider.adsEnabled) AdService.instance.showInterstitial();
   }
 
   Widget _buildHeader(
@@ -95,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           const SizedBox(width: 12),
           Text(
-            'CleanFotos',
+            'CleanPics',
             style: Theme.of(context).textTheme.headlineLarge,
           ),
           const Spacer(),

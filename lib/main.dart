@@ -5,6 +5,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'providers/app_provider.dart';
 import 'screens/home_screen.dart';
 import 'services/ad_service.dart';
+import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -13,6 +14,11 @@ void main() async {
   // Initialize ads (non-fatal if it fails)
   try {
     await AdService.instance.init();
+  } catch (_) {}
+
+  // Initialize local notifications (non-fatal if it fails)
+  try {
+    await NotificationService.instance.init();
   } catch (_) {}
 
   // Lock to portrait
@@ -30,11 +36,11 @@ void main() async {
   // Initialize photo manager log level
   PhotoManager.setLog(false);
 
-  runApp(const CleanFotosApp());
+  runApp(const CleanPicsApp());
 }
 
-class CleanFotosApp extends StatelessWidget {
-  const CleanFotosApp({super.key});
+class CleanPicsApp extends StatelessWidget {
+  const CleanPicsApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +49,7 @@ class CleanFotosApp extends StatelessWidget {
       child: Consumer<AppProvider>(
         builder: (context, provider, _) {
           return MaterialApp(
-            title: 'CleanFotos',
+            title: 'CleanPics',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             home: const HomeScreen(),

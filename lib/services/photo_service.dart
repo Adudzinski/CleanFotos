@@ -36,9 +36,15 @@ class PhotoService {
   // ─── Public API ────────────────────────────────────────────────────────────
 
   /// Request permission and return whether it was granted.
+  ///
+  /// Accepts both full ("authorized") and partial ("limited") access — on
+  /// Android 14+ and iOS, granting access often returns `limited`, which still
+  /// lets us read photos.
   Future<bool> requestPermission() async {
-    final result = await PhotoManager.requestPermissionExtend();
-    return result.isAuth;
+    final PermissionState state =
+        await PhotoManager.requestPermissionExtend();
+    return state == PermissionState.authorized ||
+        state == PermissionState.limited;
   }
 
   /// Load all recent photo groups (newest first).
@@ -74,19 +80,12 @@ class PhotoService {
       total = await albums.first.assetCountAsync;
     }
 
+    // Reuse the per-group sizes computed during grouping (no re-reading files).
     int totalBytes = 0;
     int savingsBytes = 0;
-
     for (final g in groups) {
-      for (int i = 0; i < g.assets.length; i++) {
-        final f = await g.assets[i].file;
-        if (f != null) {
-          final sz = await f.length();
-          totalBytes += sz;
-          // Assume the user keeps 1 photo per group → rest are savings
-          if (i > 0) savingsBytes += sz;
-        }
-      }
+      totalBytes += g.sizeBytes;
+      savingsBytes += g.savingsBytes;
     }
 
     return LibraryStats(
@@ -139,10 +138,12 @@ class PhotoService {
   /// when the cluster is large — a lenient visual hash.
   Future<List<PhotoGroup>> _refineCluster(
       List<AssetEntity> cluster, int baseIndex) async {
-    // Pre-compute GPS coords for everyone (cheap, no image decode).
+    // Pre-compute GPS coords and file sizes for everyone (no image decode).
     final coords = <String, List<double>?>{};
+    final sizes = <String, int>{};
     for (final a in cluster) {
       coords[a.id] = await _coords(a);
+      sizes[a.id] = await _fileSize(a);
     }
 
     // Only decode thumbnails for visual hashing when the cluster is big.
@@ -172,12 +173,15 @@ class PhotoService {
       }
 
       if (group.length >= 2) {
+        final groupSize =
+            group.fold<int>(0, (sum, a) => sum + (sizes[a.id] ?? 0));
         result.add(PhotoGroup(
           id: 'group_${baseIndex}_$subIdx',
           assets: group,
           groupDate: group.first.createDateTime,
           location: _coordLabel(coords[group.first.id]),
           similarityScore: useVisual ? 0.85 : 0.95,
+          sizeBytes: groupSize,
         ));
         subIdx++;
       }
@@ -254,12 +258,22 @@ class PhotoService {
     return d;
   }
 
+  /// File size of an asset in bytes (0 when unavailable).
+  Future<int> _fileSize(AssetEntity asset) async {
+    try {
+      final f = await asset.file;
+      return f == null ? 0 : await f.length();
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// GPS coordinates as [lat, lng], or null when unavailable.
   Future<List<double>?> _coords(AssetEntity asset) async {
     try {
       final ll = await asset.latlngAsync();
-      final lat = ll.latitude;
-      final lng = ll.longitude;
+      final lat = ll?.latitude;
+      final lng = ll?.longitude;
       if (lat == null || lng == null || (lat == 0 && lng == 0)) return null;
       return [lat, lng];
     } catch (_) {

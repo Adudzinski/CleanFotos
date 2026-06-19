@@ -25,7 +25,7 @@ class AppStrings {
   // ── Home ──────────────────────────────────────────────────────────────────
   String get welcomeTitle => 'Clean up your photos';
   String get welcomeSubtitle =>
-      'CleanFotos finds your duplicate & similar photos and helps you delete them fast.';
+      'CleanPics finds your duplicate & similar photos and helps you delete them fast.';
   String get startAnalysis => 'Analyze My Photos';
   String get analyzingPhotos => 'Analyzing your photos…';
   String get chooseMode => 'Choose mode';
@@ -44,13 +44,14 @@ class AppStrings {
   String get totalPhotos => 'Total Photos';
   String get similarGroups => 'Similar Groups';
   String get librarySize => 'Library Size';
-  String get couldSave => 'Could Save';
+  String get couldSave => 'To Be Saved';
   String get freedSpace => 'Space Freed';
   String get deletedPhotos => 'Photos Deleted';
 
   // ── Group Review ──────────────────────────────────────────────────────────
   String groupOf(int current, int total) => 'Group $current of $total';
   String photosInGroup(int n) => '$n photos';
+  String saveUpTo(String size) => 'Save ~$size';
   String get tapToSelectDelete => 'Tap photos to mark for deletion';
   String get tapToDeselect => 'Tap again to deselect';
   String get continueBtn => 'Skip';
@@ -72,7 +73,7 @@ class AppStrings {
   // ── Permissions ───────────────────────────────────────────────────────────
   String get permissionTitle => 'Photo Access Required';
   String get permissionBody =>
-      'CleanFotos needs access to your photos to find duplicates. Please grant permission in Settings.';
+      'CleanPics needs access to your photos to find duplicates. Please grant permission in Settings.';
   String get openSettings => 'Open Settings';
 
   // ── Error ─────────────────────────────────────────────────────────────────
@@ -83,10 +84,24 @@ class AppStrings {
   String get settings => 'Settings';
   String get statistics => 'Statistics';
   String get language => 'Language';
+  String get reminders => 'Reminders';
+  String get monthlyReminder => 'Monthly cleanup reminder';
+  String get monthlyReminderDesc =>
+      'Get a nudge once a month to tidy up your photos.';
+  String get reminderTitle => 'Time to clean up! 📸';
+  String get reminderBody =>
+      'Free up space — review your similar photos in CleanPics.';
   String get monetization => 'Monetization';
+  String get removeAds => 'Remove Ads';
+  String get proTitle => 'CleanPics Pro';
+  String get proDesc => 'Remove all ads forever with a one-time purchase.';
+  String proButton(String price) => 'Remove Ads · $price';
+  String get proButtonNoPrice => 'Remove Ads';
+  String get restorePurchase => 'Restore Purchase';
+  String get proUnlocked => 'Pro unlocked — thank you! 🎉';
   String get enableAds => 'Show Ads';
   String get adsDesc =>
-      'Ads keep CleanFotos free. Thank you for your support!';
+      'Ads keep CleanPics free. Thank you for your support!';
   String get monetizationTips => 'Ways to monetize this app';
   String get tip1 =>
       'Banner & interstitial ads via Google AdMob — already wired in.';
@@ -115,7 +130,7 @@ class _SpanishStrings extends AppStrings {
 
   @override String get welcomeTitle => 'Limpia tus fotos';
   @override String get welcomeSubtitle =>
-      'CleanFotos encuentra tus fotos duplicadas y similares y te ayuda a eliminarlas rápido.';
+      'CleanPics encuentra tus fotos duplicadas y similares y te ayuda a eliminarlas rápido.';
   @override String get startAnalysis => 'Analizar mis fotos';
   @override String get analyzingPhotos => 'Analizando tus fotos…';
   @override String get chooseMode => 'Elige modo';
@@ -147,16 +162,29 @@ class _SpanishStrings extends AppStrings {
   @override String get backHome => 'Volver';
   @override String deleted(int n, String size) => '${n} foto${n == 1 ? '' : 's'} eliminada${n == 1 ? '' : 's'} · ¡$size liberado!';
   @override String get permissionTitle => 'Acceso a fotos requerido';
-  @override String get permissionBody => 'CleanFotos necesita acceso a tus fotos.';
+  @override String get permissionBody => 'CleanPics necesita acceso a tus fotos.';
   @override String get openSettings => 'Abrir ajustes';
   @override String get errorMessage => 'Algo salió mal';
   @override String get retry => 'Reintentar';
   @override String get settings => 'Ajustes';
   @override String get statistics => 'Estadísticas';
   @override String get language => 'Idioma';
+  @override String get reminders => 'Recordatorios';
+  @override String get monthlyReminder => 'Recordatorio mensual';
+  @override String get monthlyReminderDesc => 'Recibe un aviso una vez al mes para ordenar tus fotos.';
+  @override String get reminderTitle => '¡Hora de limpiar! 📸';
+  @override String get reminderBody => 'Libera espacio: revisa tus fotos similares en CleanPics.';
   @override String get monetization => 'Monetización';
+  @override String saveUpTo(String size) => 'Ahorra ~$size';
+  @override String get removeAds => 'Quitar anuncios';
+  @override String get proTitle => 'CleanPics Pro';
+  @override String get proDesc => 'Elimina todos los anuncios para siempre con una compra única.';
+  @override String proButton(String price) => 'Quitar anuncios · $price';
+  @override String get proButtonNoPrice => 'Quitar anuncios';
+  @override String get restorePurchase => 'Restaurar compra';
+  @override String get proUnlocked => 'Pro activado — ¡gracias! 🎉';
   @override String get enableAds => 'Mostrar anuncios';
-  @override String get adsDesc => '¡Los anuncios mantienen CleanFotos gratis!';
+  @override String get adsDesc => '¡Los anuncios mantienen CleanPics gratis!';
   @override String get monetizationTips => 'Formas de monetizar';
   @override String get tip1 => 'Anuncios banner e intersticiales con Google AdMob.';
   @override String get tip2 => 'Compra única "Pro" para eliminar anuncios.';
@@ -175,7 +203,7 @@ class _GermanStrings extends AppStrings {
 
   @override String get welcomeTitle => 'Fotos aufräumen';
   @override String get welcomeSubtitle =>
-      'CleanFotos findet doppelte und ähnliche Fotos und hilft dir, sie schnell zu löschen.';
+      'CleanPics findet doppelte und ähnliche Fotos und hilft dir, sie schnell zu löschen.';
   @override String get startAnalysis => 'Fotos analysieren';
   @override String get analyzingPhotos => 'Fotos werden analysiert…';
   @override String get chooseMode => 'Modus wählen';
@@ -207,16 +235,29 @@ class _GermanStrings extends AppStrings {
   @override String get backHome => 'Zurück';
   @override String deleted(int n, String size) => '$n Foto${n == 1 ? '' : 's'} gelöscht · $size freigegeben!';
   @override String get permissionTitle => 'Fotozugriff erforderlich';
-  @override String get permissionBody => 'CleanFotos benötigt Zugriff auf deine Fotos.';
+  @override String get permissionBody => 'CleanPics benötigt Zugriff auf deine Fotos.';
   @override String get openSettings => 'Einstellungen öffnen';
   @override String get errorMessage => 'Etwas ist schiefgelaufen';
   @override String get retry => 'Erneut versuchen';
   @override String get settings => 'Einstellungen';
   @override String get statistics => 'Statistiken';
   @override String get language => 'Sprache';
+  @override String get reminders => 'Erinnerungen';
+  @override String get monthlyReminder => 'Monatliche Erinnerung';
+  @override String get monthlyReminderDesc => 'Erhalte einmal im Monat einen Hinweis, deine Fotos aufzuräumen.';
+  @override String get reminderTitle => 'Zeit zum Aufräumen! 📸';
+  @override String get reminderBody => 'Schaffe Platz – überprüfe deine ähnlichen Fotos in CleanPics.';
   @override String get monetization => 'Monetarisierung';
+  @override String saveUpTo(String size) => 'Spare ~$size';
+  @override String get removeAds => 'Werbung entfernen';
+  @override String get proTitle => 'CleanPics Pro';
+  @override String get proDesc => 'Entferne alle Werbung dauerhaft mit einem einmaligen Kauf.';
+  @override String proButton(String price) => 'Werbung entfernen · $price';
+  @override String get proButtonNoPrice => 'Werbung entfernen';
+  @override String get restorePurchase => 'Kauf wiederherstellen';
+  @override String get proUnlocked => 'Pro freigeschaltet — danke! 🎉';
   @override String get enableAds => 'Werbung anzeigen';
-  @override String get adsDesc => 'Werbung hält CleanFotos kostenlos!';
+  @override String get adsDesc => 'Werbung hält CleanPics kostenlos!';
   @override String get monetizationTips => 'Monetarisierungsoptionen';
   @override String get tip1 => 'Banner- & Interstitial-Werbung über Google AdMob.';
   @override String get tip2 => 'Einmaliger "Pro"-Kauf zum Entfernen von Werbung.';
@@ -235,7 +276,7 @@ class _FrenchStrings extends AppStrings {
 
   @override String get welcomeTitle => 'Nettoyez vos photos';
   @override String get welcomeSubtitle =>
-      'CleanFotos trouve vos photos similaires et vous aide à les supprimer rapidement.';
+      'CleanPics trouve vos photos similaires et vous aide à les supprimer rapidement.';
   @override String get startAnalysis => 'Analyser mes photos';
   @override String get analyzingPhotos => 'Analyse en cours…';
   @override String get chooseMode => 'Choisir un mode';
@@ -267,16 +308,29 @@ class _FrenchStrings extends AppStrings {
   @override String get backHome => 'Retour';
   @override String deleted(int n, String size) => '$n photo${n == 1 ? '' : 's'} supprimée${n == 1 ? '' : 's'} · $size libéré !';
   @override String get permissionTitle => 'Accès aux photos requis';
-  @override String get permissionBody => 'CleanFotos a besoin d\'accéder à vos photos.';
+  @override String get permissionBody => 'CleanPics a besoin d\'accéder à vos photos.';
   @override String get openSettings => 'Ouvrir les paramètres';
   @override String get errorMessage => 'Une erreur s\'est produite';
   @override String get retry => 'Réessayer';
   @override String get settings => 'Paramètres';
   @override String get statistics => 'Statistiques';
   @override String get language => 'Langue';
+  @override String get reminders => 'Rappels';
+  @override String get monthlyReminder => 'Rappel mensuel';
+  @override String get monthlyReminderDesc => 'Recevez un rappel une fois par mois pour ranger vos photos.';
+  @override String get reminderTitle => 'C\'est l\'heure du tri ! 📸';
+  @override String get reminderBody => 'Libérez de l\'espace : passez en revue vos photos similaires dans CleanPics.';
   @override String get monetization => 'Monétisation';
+  @override String saveUpTo(String size) => 'Gagnez ~$size';
+  @override String get removeAds => 'Supprimer les pubs';
+  @override String get proTitle => 'CleanPics Pro';
+  @override String get proDesc => 'Supprimez toutes les pubs pour toujours avec un achat unique.';
+  @override String proButton(String price) => 'Supprimer les pubs · $price';
+  @override String get proButtonNoPrice => 'Supprimer les pubs';
+  @override String get restorePurchase => 'Restaurer l\'achat';
+  @override String get proUnlocked => 'Pro activé — merci ! 🎉';
   @override String get enableAds => 'Afficher les publicités';
-  @override String get adsDesc => 'Les pubs gardent CleanFotos gratuit !';
+  @override String get adsDesc => 'Les pubs gardent CleanPics gratuit !';
   @override String get monetizationTips => 'Options de monétisation';
   @override String get tip1 => 'Publicités bannière & interstitielles via AdMob.';
   @override String get tip2 => 'Achat unique "Pro" pour supprimer les pubs.';
@@ -295,7 +349,7 @@ class _PortugueseStrings extends AppStrings {
 
   @override String get welcomeTitle => 'Organize suas fotos';
   @override String get welcomeSubtitle =>
-      'CleanFotos encontra fotos duplicadas e similares e ajuda você a deletá-las rapidamente.';
+      'CleanPics encontra fotos duplicadas e similares e ajuda você a deletá-las rapidamente.';
   @override String get startAnalysis => 'Analisar minhas fotos';
   @override String get analyzingPhotos => 'Analisando fotos…';
   @override String get chooseMode => 'Escolha o modo';
@@ -327,16 +381,29 @@ class _PortugueseStrings extends AppStrings {
   @override String get backHome => 'Voltar';
   @override String deleted(int n, String size) => '$n foto${n == 1 ? '' : 's'} deletada${n == 1 ? '' : 's'} · $size liberado!';
   @override String get permissionTitle => 'Acesso às fotos necessário';
-  @override String get permissionBody => 'CleanFotos precisa de acesso às suas fotos.';
+  @override String get permissionBody => 'CleanPics precisa de acesso às suas fotos.';
   @override String get openSettings => 'Abrir configurações';
   @override String get errorMessage => 'Algo deu errado';
   @override String get retry => 'Tentar novamente';
   @override String get settings => 'Configurações';
   @override String get statistics => 'Estatísticas';
   @override String get language => 'Idioma';
+  @override String get reminders => 'Lembretes';
+  @override String get monthlyReminder => 'Lembrete mensal';
+  @override String get monthlyReminderDesc => 'Receba um aviso uma vez por mês para organizar suas fotos.';
+  @override String get reminderTitle => 'Hora de limpar! 📸';
+  @override String get reminderBody => 'Libere espaço — revise suas fotos similares no CleanPics.';
   @override String get monetization => 'Monetização';
+  @override String saveUpTo(String size) => 'Economize ~$size';
+  @override String get removeAds => 'Remover anúncios';
+  @override String get proTitle => 'CleanPics Pro';
+  @override String get proDesc => 'Remova todos os anúncios para sempre com uma compra única.';
+  @override String proButton(String price) => 'Remover anúncios · $price';
+  @override String get proButtonNoPrice => 'Remover anúncios';
+  @override String get restorePurchase => 'Restaurar compra';
+  @override String get proUnlocked => 'Pro ativado — obrigado! 🎉';
   @override String get enableAds => 'Mostrar anúncios';
-  @override String get adsDesc => 'Os anúncios mantêm o CleanFotos gratuito!';
+  @override String get adsDesc => 'Os anúncios mantêm o CleanPics gratuito!';
   @override String get monetizationTips => 'Formas de monetizar';
   @override String get tip1 => 'Anúncios banner e intersticiais via Google AdMob.';
   @override String get tip2 => 'Compra única "Pro" para remover anúncios.';
@@ -355,7 +422,7 @@ class _ItalianStrings extends AppStrings {
 
   @override String get welcomeTitle => 'Pulisci le tue foto';
   @override String get welcomeSubtitle =>
-      'CleanFotos trova le tue foto duplicate e simili e ti aiuta a eliminarle velocemente.';
+      'CleanPics trova le tue foto duplicate e simili e ti aiuta a eliminarle velocemente.';
   @override String get startAnalysis => 'Analizza le mie foto';
   @override String get analyzingPhotos => 'Analisi in corso…';
   @override String get chooseMode => 'Scegli modalità';
@@ -387,16 +454,29 @@ class _ItalianStrings extends AppStrings {
   @override String get backHome => 'Torna alla home';
   @override String deleted(int n, String size) => '$n foto eliminate · $size liberato!';
   @override String get permissionTitle => 'Accesso alle foto richiesto';
-  @override String get permissionBody => 'CleanFotos ha bisogno di accedere alle tue foto.';
+  @override String get permissionBody => 'CleanPics ha bisogno di accedere alle tue foto.';
   @override String get openSettings => 'Apri impostazioni';
   @override String get errorMessage => 'Qualcosa è andato storto';
   @override String get retry => 'Riprova';
   @override String get settings => 'Impostazioni';
   @override String get statistics => 'Statistiche';
   @override String get language => 'Lingua';
+  @override String get reminders => 'Promemoria';
+  @override String get monthlyReminder => 'Promemoria mensile';
+  @override String get monthlyReminderDesc => 'Ricevi un promemoria una volta al mese per sistemare le tue foto.';
+  @override String get reminderTitle => 'È ora di fare pulizia! 📸';
+  @override String get reminderBody => 'Libera spazio: rivedi le tue foto simili in CleanPics.';
   @override String get monetization => 'Monetizzazione';
+  @override String saveUpTo(String size) => 'Risparmia ~$size';
+  @override String get removeAds => 'Rimuovi pubblicità';
+  @override String get proTitle => 'CleanPics Pro';
+  @override String get proDesc => 'Rimuovi tutta la pubblicità per sempre con un acquisto unico.';
+  @override String proButton(String price) => 'Rimuovi pubblicità · $price';
+  @override String get proButtonNoPrice => 'Rimuovi pubblicità';
+  @override String get restorePurchase => 'Ripristina acquisto';
+  @override String get proUnlocked => 'Pro attivato — grazie! 🎉';
   @override String get enableAds => 'Mostra pubblicità';
-  @override String get adsDesc => 'Le pubblicità mantengono CleanFotos gratuito!';
+  @override String get adsDesc => 'Le pubblicità mantengono CleanPics gratuito!';
   @override String get monetizationTips => 'Modi per monetizzare';
   @override String get tip1 => 'Banner e annunci interstitiziali via Google AdMob.';
   @override String get tip2 => 'Acquisto unico "Pro" per rimuovere le pub.';

@@ -1,13 +1,13 @@
-# CleanFotos — Project Overview
+# CleanPics — Project Overview
 
-CleanFotos is a Flutter app that helps people quickly clean up their photo
+CleanPics is a Flutter app that helps people quickly clean up their photo
 library by finding groups of similar photos (mostly bursts and near-duplicate
 shots taken around the same time) and making them fast and satisfying to delete.
 
 ## The idea
 
 People take many near-identical photos — ten selfies in a row, a few tries at
-the same sunset — and never go back to clean them up. CleanFotos surfaces these
+the same sunset — and never go back to clean them up. CleanPics surfaces these
 clusters and lets the user delete the extras in seconds, with a clear sense of
 how much space they freed.
 
@@ -101,8 +101,12 @@ toggle. See the "Monetization plan" section below for the recommended strategy.
 
 - [ ] Replace test AdMob App IDs (`AndroidManifest.xml`, `ios/Runner/Info.plist`)
       and the test unit IDs in `lib/services/ad_service.dart` with real ones.
-- [ ] Set a real `applicationId` / bundle identifier (currently
-      `com.example.cleanfotos_app`).
+- [ ] Create the **non-consumable** in-app product `cleanpics_pro` in App Store
+      Connect and Google Play Console (the ID is in
+      `lib/services/purchase_service.dart`). Until it exists, the Pro buy button
+      stays hidden. Server-side receipt validation is recommended for production.
+- [x] Android `applicationId` set to `com.crocodata.cleanpics`.
+- [ ] Set the matching iOS bundle identifier (`com.crocodata.cleanpics`) in Xcode.
 - [ ] Add a release signing config for Android (currently signs with debug keys).
 - [ ] Design a real app icon and logo (currently the default Flutter icon +
       an `auto_awesome` placeholder in-app).
@@ -111,10 +115,11 @@ toggle. See the "Monetization plan" section below for the recommended strategy.
 
 **Product polish**
 
-- [ ] Add a "Pro" in-app purchase to remove ads (see plan below).
+- [x] One-time "Pro" in-app purchase to remove ads (`lib/services/purchase_service.dart`,
+      Settings → CleanPics Pro). Needs the store product configured (see above).
+- [x] Per-group "Save ~X" size labels on the group review screen.
 - [ ] Reverse-geocode GPS coordinates to place names (currently shows raw
       lat/lng).
-- [ ] Show per-group size ("free up 24 MB") on the group cards.
 - [ ] Undo for accidental deletes.
 - [ ] Move heavy grouping work off the UI thread (isolate) for very large
       libraries.
@@ -128,11 +133,16 @@ For a free, worldwide consumer utility like this, a hybrid model works best:
 1. **Ads (now)** — banner + interstitial via AdMob, already wired. Keep
    interstitials infrequent (once per cleanup session, as implemented) so they
    don't sour the "satisfying cleanup" feeling. This is your baseline revenue.
-2. **One-time "Pro" unlock (highest impact)** — a single in-app purchase
-   (~$2.99–4.99) that removes ads and could add nice-to-haves (advanced stats,
-   video/screenshot cleanup, larger batch sizes). Utility apps convert far better
-   on a cheap one-time unlock than on subscriptions, and it pairs naturally with
-   the existing "Show Ads" toggle.
+2. **One-time "Pro" unlock (highest impact)** — a single cheap in-app purchase
+   that removes ads and could add nice-to-haves (advanced stats,
+   video/screenshot cleanup, larger batch sizes). It's wired up and defaults to a
+   planned price of **$1.99** (`plannedProPrice` in `purchase_service.dart`); the
+   real localized price comes from the store once the product is configured.
+   Utility apps convert far better on a cheap one-time unlock than on
+   subscriptions, and it pairs naturally with the existing "Show Ads" toggle.
+
+   Note: the in-app "ways to monetize" tips were removed from Settings (they're
+   developer notes, not user-facing) — they live in this section instead.
 3. **Subscription (only if there's an ongoing service)** — justified only if you
    add a recurring-value feature like cloud backup or cross-device sync.
    Otherwise users resent subscriptions for a one-off cleanup tool.

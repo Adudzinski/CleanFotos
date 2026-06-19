@@ -1,5 +1,5 @@
 name: cleanfotos_app
-description: CleanFotos - Smart photo cleanup app
+description: CleanPics - Smart photo cleanup app
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -29,6 +29,14 @@ dependencies:
   # Ads monetization
   google_mobile_ads: ^9.0.0
 
+  # One-time "Pro" in-app purchase (remove ads)
+  in_app_purchase: ^3.2.0
+
+  # Monthly local reminder notifications
+  flutter_local_notifications: ^17.2.4
+  flutter_timezone: ^3.0.1
+  timezone: ^0.9.4
+
   # Image decoding for perceptual hashing (similarity filter)
   image: ^4.2.0
 
@@ -42,6 +50,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
+
+# App icon generation — run: dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon_legacy.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  min_sdk_android: 23

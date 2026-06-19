@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
+import '../services/purchase_service.dart';
 import '../theme/app_theme.dart';
 import '../l10n/strings.dart';
 
@@ -31,7 +32,13 @@ class SettingsScreen extends StatelessWidget {
 
           // ── Monetization / Ads ───────────────────────────────────────────
           _sectionHeader(s.monetization),
-          _adsCard(context, provider, s),
+          _proCard(context, provider, s),
+
+          const SizedBox(height: 24),
+
+          // ── Reminders ─────────────────────────────────────────────────────
+          _sectionHeader(s.reminders),
+          _reminderCard(context, provider, s),
 
           const SizedBox(height: 24),
 
@@ -162,70 +169,101 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _adsCard(
+  Widget _proCard(
       BuildContext context, AppProvider provider, AppStrings s) {
+    // Already unlocked
+    if (provider.isPro) {
+      return _card(
+        child: Row(
+          children: [
+            const Icon(Icons.workspace_premium,
+                color: AppTheme.success, size: 28),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(s.proUnlocked,
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final purchase = PurchaseService.instance;
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(s.enableAds,
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text(s.adsDesc,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.textSecondary,
-                            height: 1.4)),
-                  ],
-                ),
-              ),
+              const Icon(Icons.workspace_premium,
+                  color: AppTheme.primary, size: 26),
               const SizedBox(width: 12),
-              Switch(
-                value: provider.showAds,
-                onChanged: provider.setShowAds,
-                activeColor: AppTheme.primary,
-              ),
+              Text(s.proTitle,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 16),
-          Text(s.monetizationTips,
+          const SizedBox(height: 8),
+          Text(s.proDesc,
               style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary)),
-          const SizedBox(height: 10),
-          _tipRow('📱', s.tip1),
-          _tipRow('⭐', s.tip2),
-          _tipRow('🌟', s.tip3),
-          _tipRow('📊', s.tip4),
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                  height: 1.4)),
+          const SizedBox(height: 14),
+          ElevatedButton.icon(
+            onPressed: purchase.isAvailable ? () => purchase.buyPro() : null,
+            icon: const Icon(Icons.block, size: 20),
+            label: Text(s.proButton(purchase.displayPrice)),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+          if (purchase.isAvailable)
+            Center(
+              child: TextButton(
+                onPressed: () => purchase.restore(),
+                child: Text(s.restorePurchase,
+                    style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _tipRow(String emoji, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+  Widget _reminderCard(
+      BuildContext context, AppProvider provider, AppStrings s) {
+    return _card(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 10),
           Expanded(
-            child: Text(text,
-                style: const TextStyle(
-                    fontSize: 14,
-                    color: AppTheme.textSecondary,
-                    height: 1.4)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(s.monthlyReminder,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(s.monthlyReminderDesc,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                        height: 1.4)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Switch(
+            value: provider.remindersEnabled,
+            onChanged: provider.setReminders,
+            activeColor: AppTheme.primary,
           ),
         ],
       ),
@@ -234,15 +272,7 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _aboutCard(BuildContext context, AppStrings s) {
     return _card(
-      child: Column(
-        children: [
-          _infoRow(s.appVersion, '1.0.0'),
-          _divider(),
-          _infoRow(s.buildWith, 'Flutter 3.x'),
-          _divider(),
-          _infoRow(s.developerTip, s.developerTipValue),
-        ],
-      ),
+      child: _infoRow(s.appVersion, '1.0.0'),
     );
   }
 

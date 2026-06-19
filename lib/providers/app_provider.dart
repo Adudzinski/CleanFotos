@@ -1,8 +1,14 @@
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/strings.dart';
 import '../models/photo_group.dart';
+import '../services/notification_service.dart';
 import '../services/photo_service.dart';
+import '../services/purchase_service.dart';
+
+const Set<String> kSupportedLanguages = {'en', 'es', 'de', 'fr', 'pt', 'it'};
 
 enum AppState { initial, loading, ready, permissionDenied, error }
 
@@ -17,7 +23,11 @@ class AppProvider extends ChangeNotifier {
   int freedBytes = 0;
   int deletedCount = 0;
   String languageCode = 'en';
-  bool showAds = true;
+  bool isPro = false;
+  bool remindersEnabled = true;
+
+  /// Ads show unless the user has unlocked Pro.
+  bool get adsEnabled => !isPro;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -25,8 +35,50 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     freedBytes = prefs.getInt('freed_bytes') ?? 0;
     deletedCount = prefs.getInt('deleted_count') ?? 0;
-    languageCode = prefs.getString('language_code') ?? 'en';
-    showAds = prefs.getBool('show_ads') ?? true;
+    // Default to the phone's language on first launch, else the saved choice.
+    languageCode = prefs.getString('language_code') ?? _deviceLanguage();
+    isPro = prefs.getBool('is_pro') ?? false;
+    remindersEnabled = prefs.getBool('reminders_enabled') ?? true;
+    notifyListeners();
+
+    // Set up in-app purchases; unlock Pro when a purchase/restore completes.
+    PurchaseService.instance.init(onPurchased: () => setPro(true));
+
+    // Schedule (or clear) the monthly cleanup reminder.
+    _setupReminders();
+  }
+
+  /// The phone's language if we support it, otherwise English.
+  String _deviceLanguage() {
+    final code = PlatformDispatcher.instance.locale.languageCode.toLowerCase();
+    return kSupportedLanguages.contains(code) ? code : 'en';
+  }
+
+  Future<void> _setupReminders() async {
+    if (!remindersEnabled) {
+      await NotificationService.instance.cancelMonthlyReminder();
+      return;
+    }
+    await NotificationService.instance.requestPermissions();
+    final s = AppStrings.of(languageCode);
+    await NotificationService.instance.scheduleMonthlyReminder(
+      title: s.reminderTitle,
+      body: s.reminderBody,
+    );
+  }
+
+  Future<void> setReminders(bool value) async {
+    remindersEnabled = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('reminders_enabled', value);
+    notifyListeners();
+    await _setupReminders();
+  }
+
+  Future<void> setPro(bool value) async {
+    isPro = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_pro', value);
     notifyListeners();
   }
 
@@ -102,13 +154,8 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('language_code', code);
     notifyListeners();
-  }
-
-  Future<void> setShowAds(bool value) async {
-    showAds = value;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('show_ads', value);
-    notifyListeners();
+    // Re-schedule the reminder so its text matches the new language.
+    await _setupReminders();
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
