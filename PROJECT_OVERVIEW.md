@@ -110,8 +110,9 @@ toggle. See the "Monetization plan" section below for the recommended strategy.
 - [ ] Add a release signing config for Android (currently signs with debug keys).
 - [ ] Design a real app icon and logo (currently the default Flutter icon +
       an `auto_awesome` placeholder in-app).
-- [ ] Add a privacy policy (required for photo access + ads) and a
-      consent flow (GDPR/UMP) for ads in the EU.
+- [x] Privacy policy hosted at https://crocodata.net/cleanpics/privacy-policy.html
+      and linked in app Settings.
+- [ ] Add the GDPR/UMP ad consent flow for EU users (still TODO in code).
 
 **Product polish**
 

@@ -84,18 +84,11 @@ class _HomeScreenState extends State<HomeScreen>
       child: Row(
         children: [
           // Logo + title
-          Container(
+          Image.asset(
+            'assets/icon/icon_header.png',
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppTheme.primary, AppTheme.secondary],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.auto_awesome, color: Colors.white, size: 24),
+            fit: BoxFit.contain,
           ),
           const SizedBox(width: 12),
           Text(

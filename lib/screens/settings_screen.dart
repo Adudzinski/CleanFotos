@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../services/purchase_service.dart';
 import '../theme/app_theme.dart';
 import '../l10n/strings.dart';
+
+const String kPrivacyPolicyUrl =
+    'https://crocodata.net/cleanpics/privacy-policy.html';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -216,7 +220,11 @@ class SettingsScreen extends StatelessWidget {
           ElevatedButton.icon(
             onPressed: purchase.isAvailable ? () => purchase.buyPro() : null,
             icon: const Icon(Icons.block, size: 20),
-            label: Text(s.proButton(purchase.displayPrice)),
+            // Google returns the price already localized to the user's currency;
+            // show "Remove Ads" (no price) until it loads.
+            label: Text(purchase.price != null
+                ? s.proButton(purchase.price!)
+                : s.proButtonNoPrice),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
               shape: RoundedRectangleBorder(
@@ -272,8 +280,36 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _aboutCard(BuildContext context, AppStrings s) {
     return _card(
-      child: _infoRow(s.appVersion, '1.0.0'),
+      child: Column(
+        children: [
+          _infoRow(s.appVersion, '1.0.0'),
+          _divider(),
+          InkWell(
+            onTap: _openPrivacyPolicy,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Text(s.privacyPolicy,
+                      style: const TextStyle(
+                          fontSize: 15, color: AppTheme.textSecondary)),
+                  const Spacer(),
+                  const Icon(Icons.open_in_new,
+                      size: 18, color: AppTheme.textSecondary),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(kPrivacyPolicyUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _statRow(BuildContext context,

@@ -15,6 +15,10 @@ class AdService {
   bool _initialized = false;
   InterstitialAd? _interstitial;
 
+  // Frequency cap: show an interstitial at most once per this interval.
+  static const Duration _interstitialCooldown = Duration(minutes: 4);
+  DateTime? _lastInterstitial;
+
   // ── Real (production) unit IDs from the AdMob console ───────────────────────
   // Leave a value empty until that unit is created → it falls back to a test ID.
   static const _androidBannerProd = 'ca-app-pub-6352577985769083/7886470703';
@@ -46,6 +50,8 @@ class AdService {
     if (_initialized) return;
     await MobileAds.instance.initialize();
     _initialized = true;
+    // Start the cooldown now so the user gets an ad-free first few minutes.
+    _lastInterstitial = DateTime.now();
     _loadInterstitial();
   }
 
@@ -60,11 +66,17 @@ class AdService {
     );
   }
 
-  /// Show a full-screen ad if one is ready, then pre-load the next.
-  /// No-op if the SDK isn't initialized or no ad is loaded yet.
+  /// Show a full-screen ad if one is ready AND the cooldown has elapsed, then
+  /// pre-load the next. No-op if not ready or shown too recently.
   void showInterstitial() {
+    final last = _lastInterstitial;
+    if (last != null &&
+        DateTime.now().difference(last) < _interstitialCooldown) {
+      return;
+    }
     final ad = _interstitial;
     if (ad == null) return;
+    _lastInterstitial = DateTime.now();
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();

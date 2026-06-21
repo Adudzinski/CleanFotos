@@ -29,9 +29,10 @@ These apply regardless of platform.
    product with the exact ID `cleanpics_pro` (see `purchase_service.dart`). Set
    the price (planned: $1.99). Until this exists, the Pro button stays disabled.
 
-5. **Privacy policy (required).** Because the app accesses photos and shows ads,
-   both stores require a hosted privacy policy URL. Generate one (e.g. with a
-   free policy generator) and host it (a GitHub Pages page works).
+5. **Privacy policy (required).** Done — hosted at
+   `https://crocodata.net/cleanpics/privacy-policy.html` and linked in the app's
+   Settings. Use this URL in the Play Console data-safety / store-listing forms.
+   (Remember to deploy the website so the page is live: `firebase deploy`.)
 
 6. **Ad consent (EU/UK).** Add Google's UMP consent flow (User Messaging
    Platform) so EU users get a GDPR consent prompt before personalized ads.

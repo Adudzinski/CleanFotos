@@ -66,6 +66,8 @@ class AppStrings {
   String get swipeDone => 'You\'re done!';
   String get deleted_noun => 'deleted';
   String get backHome => 'Back to Home';
+  String get recoverHint =>
+      'Deleted photos stay in your phone\'s "Recently Deleted" for ~30 days.';
 
   // ── Celebration ───────────────────────────────────────────────────────────
   String deleted(int n, String size) => '$n photo${n == 1 ? '' : 's'} deleted · $size freed!';
@@ -112,6 +114,7 @@ class AppStrings {
   String get tip4 =>
       'App Store Optimization + positive ratings drive organic installs.';
   String get about => 'About';
+  String get privacyPolicy => 'Privacy Policy';
   String get appVersion => 'Version';
   String get buildWith => 'Built with';
   String get developerTip => 'Tip for launch';
@@ -160,6 +163,7 @@ class _SpanishStrings extends AppStrings {
   @override String get swipeDone => '¡Listo!';
   @override String get deleted_noun => 'borradas';
   @override String get backHome => 'Volver';
+  @override String get recoverHint => 'Las fotos borradas quedan en "Eliminadas recientemente" del teléfono ~30 días.';
   @override String deleted(int n, String size) => '${n} foto${n == 1 ? '' : 's'} eliminada${n == 1 ? '' : 's'} · ¡$size liberado!';
   @override String get permissionTitle => 'Acceso a fotos requerido';
   @override String get permissionBody => 'CleanPics necesita acceso a tus fotos.';
@@ -191,6 +195,7 @@ class _SpanishStrings extends AppStrings {
   @override String get tip3 => 'Suscripción con sincronización inteligente.';
   @override String get tip4 => 'ASO + valoraciones positivas = más descargas.';
   @override String get about => 'Acerca de';
+  @override String get privacyPolicy => 'Política de privacidad';
   @override String get appVersion => 'Versión';
   @override String get buildWith => 'Creado con';
   @override String get developerTip => 'Consejo';
@@ -233,6 +238,7 @@ class _GermanStrings extends AppStrings {
   @override String get swipeDone => 'Fertig!';
   @override String get deleted_noun => 'gelöscht';
   @override String get backHome => 'Zurück';
+  @override String get recoverHint => 'Gelöschte Fotos bleiben ~30 Tage im Ordner „Zuletzt gelöscht" deines Handys.';
   @override String deleted(int n, String size) => '$n Foto${n == 1 ? '' : 's'} gelöscht · $size freigegeben!';
   @override String get permissionTitle => 'Fotozugriff erforderlich';
   @override String get permissionBody => 'CleanPics benötigt Zugriff auf deine Fotos.';
@@ -264,6 +270,7 @@ class _GermanStrings extends AppStrings {
   @override String get tip3 => 'Abonnement mit smarter Cloud-Synchronisation.';
   @override String get tip4 => 'ASO + gute Bewertungen = mehr Downloads.';
   @override String get about => 'Über';
+  @override String get privacyPolicy => 'Datenschutz';
   @override String get appVersion => 'Version';
   @override String get buildWith => 'Erstellt mit';
   @override String get developerTip => 'Tipp';
@@ -306,6 +313,7 @@ class _FrenchStrings extends AppStrings {
   @override String get swipeDone => 'Terminé !';
   @override String get deleted_noun => 'supprimées';
   @override String get backHome => 'Retour';
+  @override String get recoverHint => 'Les photos supprimées restent ~30 jours dans « Supprimées récemment ».';
   @override String deleted(int n, String size) => '$n photo${n == 1 ? '' : 's'} supprimée${n == 1 ? '' : 's'} · $size libéré !';
   @override String get permissionTitle => 'Accès aux photos requis';
   @override String get permissionBody => 'CleanPics a besoin d\'accéder à vos photos.';
@@ -337,6 +345,7 @@ class _FrenchStrings extends AppStrings {
   @override String get tip3 => 'Abonnement avec synchronisation cloud intelligente.';
   @override String get tip4 => 'ASO + avis positifs = plus de téléchargements.';
   @override String get about => 'À propos';
+  @override String get privacyPolicy => 'Politique de confidentialité';
   @override String get appVersion => 'Version';
   @override String get buildWith => 'Créé avec';
   @override String get developerTip => 'Conseil';
@@ -379,6 +388,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get swipeDone => 'Concluído!';
   @override String get deleted_noun => 'deletadas';
   @override String get backHome => 'Voltar';
+  @override String get recoverHint => 'Fotos apagadas ficam ~30 dias em "Apagadas recentemente" do telefone.';
   @override String deleted(int n, String size) => '$n foto${n == 1 ? '' : 's'} deletada${n == 1 ? '' : 's'} · $size liberado!';
   @override String get permissionTitle => 'Acesso às fotos necessário';
   @override String get permissionBody => 'CleanPics precisa de acesso às suas fotos.';
@@ -410,6 +420,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get tip3 => 'Assinatura com sincronização inteligente.';
   @override String get tip4 => 'ASO + avaliações positivas = mais downloads.';
   @override String get about => 'Sobre';
+  @override String get privacyPolicy => 'Política de privacidade';
   @override String get appVersion => 'Versão';
   @override String get buildWith => 'Criado com';
   @override String get developerTip => 'Dica';
@@ -452,6 +463,7 @@ class _ItalianStrings extends AppStrings {
   @override String get swipeDone => 'Fatto!';
   @override String get deleted_noun => 'eliminate';
   @override String get backHome => 'Torna alla home';
+  @override String get recoverHint => 'Le foto eliminate restano ~30 giorni in "Eliminate di recente".';
   @override String deleted(int n, String size) => '$n foto eliminate · $size liberato!';
   @override String get permissionTitle => 'Accesso alle foto richiesto';
   @override String get permissionBody => 'CleanPics ha bisogno di accedere alle tue foto.';
@@ -483,6 +495,7 @@ class _ItalianStrings extends AppStrings {
   @override String get tip3 => 'Abbonamento con sincronizzazione cloud intelligente.';
   @override String get tip4 => 'ASO + recensioni positive = più download.';
   @override String get about => 'Informazioni';
+  @override String get privacyPolicy => 'Informativa sulla privacy';
   @override String get appVersion => 'Versione';
   @override String get buildWith => 'Creato con';
   @override String get developerTip => 'Consiglio';

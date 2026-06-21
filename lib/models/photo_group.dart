@@ -1,5 +1,9 @@
 import 'package:photo_manager/photo_manager.dart';
 
+/// Average photo size used for fast size/savings estimates (~3.5 MB), so we
+/// never have to read photo files (which is slow on Android).
+const int kAvgPhotoBytes = 3670016;
+
 /// A group of visually/temporally similar photos.
 class PhotoGroup {
   final String id;

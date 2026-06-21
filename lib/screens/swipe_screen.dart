@@ -37,9 +37,15 @@ class _SwipeScreenState extends State<SwipeScreen>
   int _deletedCount = 0;
   int _freedBytes = 0;
 
+  // Photos swiped to delete are queued and removed in ONE batch (a single
+  // system permission dialog) when the user finishes or leaves.
+  final List<AssetEntity> _pendingDelete = [];
+  late final AppProvider _provider;
+
   @override
   void initState() {
     super.initState();
+    _provider = context.read<AppProvider>();
     // Flatten all group assets (skip the "best" first photo per group)
     _queue = widget.groups
         .expand((g) => g.assets.skip(1)) // skip first as "keep" candidate
@@ -60,8 +66,18 @@ class _SwipeScreenState extends State<SwipeScreen>
 
   @override
   void dispose() {
+    // Flush any queued deletions if the user leaves before finishing.
+    _commitDeletions();
     _flyOut.dispose();
     super.dispose();
+  }
+
+  /// Delete all queued photos in one batch (one permission dialog).
+  Future<void> _commitDeletions() async {
+    if (_pendingDelete.isEmpty) return;
+    final batch = List<AssetEntity>.from(_pendingDelete);
+    _pendingDelete.clear();
+    await _provider.deleteAssets(batch);
   }
 
   bool get _done => _current >= _queue.length;
@@ -79,15 +95,14 @@ class _SwipeScreenState extends State<SwipeScreen>
     await _flyOut.forward(from: 0);
     _flyOut.reset();
 
-    final asset = _queue[_current];
-    final provider = context.read<AppProvider>();
-    final freed = await provider.deleteAssets([asset]);
+    // Queue for batch deletion (don't hit the OS dialog per swipe).
+    _pendingDelete.add(_queue[_current]);
     _deletedCount++;
-    _freedBytes += freed;
+    _freedBytes += kAvgPhotoBytes;
 
-    final s = AppStrings.of(provider.languageCode);
+    final s = AppStrings.of(_provider.languageCode);
     CelebrationOverlay.of(context)
-        ?.celebrate(s.deleted(1, _formatBytes(freed)));
+        ?.celebrate(s.deleted(1, _formatBytes(kAvgPhotoBytes)));
 
     setState(() {
       _current++;
@@ -95,6 +110,8 @@ class _SwipeScreenState extends State<SwipeScreen>
       _dragY = 0;
       _isDragging = false;
     });
+
+    if (_current >= _queue.length) await _commitDeletions();
   }
 
   void _swipeRight() async {
@@ -116,6 +133,8 @@ class _SwipeScreenState extends State<SwipeScreen>
       _dragY = 0;
       _isDragging = false;
     });
+
+    if (_current >= _queue.length) await _commitDeletions();
   }
 
   void _onDragUpdate(DragUpdateDetails d) {
@@ -355,7 +374,13 @@ class _SwipeScreenState extends State<SwipeScreen>
                 fontSize: 14,
                 fontWeight: FontWeight.w500),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 6),
+          Text(
+            s.recoverHint,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [

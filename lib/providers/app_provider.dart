@@ -84,6 +84,9 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Permission + Load ────────────────────────────────────────────────────
 
+  /// Newest photos analyzed first for a fast first paint; the rest run after.
+  static const int _initialBatch = 600;
+
   Future<void> loadPhotos() async {
     state = AppState.loading;
     notifyListeners();
@@ -96,42 +99,60 @@ class AppProvider extends ChangeNotifier {
     }
 
     try {
-      groups = await _service.loadGroups();
-      stats = await _service.loadStats(groups);
+      final all = await _service.loadAllAssets();
+
+      // Phase 1: group just the newest photos and show them immediately.
+      final firstWindow =
+          all.length > _initialBatch ? all.sublist(0, _initialBatch) : all;
+      groups = await _service.groupAssets(firstWindow);
+      stats = _service.estimateStats(all.length, groups);
       state = AppState.ready;
+      notifyListeners();
+
+      // Phase 2: scan the remaining photos in the background, then update.
+      if (all.length > _initialBatch) {
+        final full = await _service.groupAssets(all);
+        groups = full;
+        stats = _service.estimateStats(all.length, full);
+        notifyListeners();
+      }
     } catch (e) {
       state = AppState.error;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   // ─── Delete ───────────────────────────────────────────────────────────────
 
-  /// Delete selected assets from a group.
-  /// Returns bytes freed.
+  /// Delete the given assets in one batch (one system confirmation dialog).
+  /// Returns estimated bytes freed. No-op / 0 if the user denies.
   Future<int> deleteAssets(List<AssetEntity> toDelete) async {
-    int freed = 0;
-    for (final asset in toDelete) {
-      final file = await asset.file;
-      if (file != null) freed += await file.length();
+    if (toDelete.isEmpty) return 0;
+
+    List<String> deletedIds;
+    try {
+      deletedIds = await PhotoManager.editor.deleteWithIds(
+        toDelete.map((a) => a.id).toList(),
+      );
+    } catch (_) {
+      return 0; // user denied or an error occurred
     }
+    if (deletedIds.isEmpty) return 0;
 
-    await PhotoManager.editor.deleteWithIds(
-      toDelete.map((a) => a.id).toList(),
-    );
-
+    final freed = deletedIds.length * kAvgPhotoBytes;
     freedBytes += freed;
-    deletedCount += toDelete.length;
+    deletedCount += deletedIds.length;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('freed_bytes', freedBytes);
     await prefs.setInt('deleted_count', deletedCount);
 
-    // Remove deleted assets from groups
+    // Remove the actually-deleted assets from the groups.
+    final deletedSet = deletedIds.toSet();
     groups = groups
         .map((g) {
           final remaining =
-              g.assets.where((a) => !toDelete.contains(a)).toList();
+              g.assets.where((a) => !deletedSet.contains(a.id)).toList();
           return g.copyWith(assets: remaining);
         })
         .where((g) => g.assets.length >= 2)

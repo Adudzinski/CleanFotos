@@ -359,6 +359,13 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                 color: AppTheme.textSecondary,
                 fontWeight: FontWeight.w500),
           ),
+          const SizedBox(height: 4),
+          Text(
+            s.recoverHint,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 11, color: AppTheme.textSecondary),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
