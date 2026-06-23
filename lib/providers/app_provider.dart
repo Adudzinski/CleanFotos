@@ -4,6 +4,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
 import '../models/photo_group.dart';
+import '../services/ad_service.dart';
 import '../services/notification_service.dart';
 import '../services/photo_service.dart';
 import '../services/purchase_service.dart';
@@ -18,6 +19,15 @@ class AppProvider extends ChangeNotifier {
   AppState state = AppState.initial;
   List<PhotoGroup> groups = [];
   LibraryStats stats = LibraryStats.empty;
+
+  /// Whether the (lazy) photo grouping has actually run yet. Until then we only
+  /// know the library size, not how many similar groups exist.
+  bool groupsLoaded = false;
+
+  /// True while photos are being loaded + grouped for a cleanup mode.
+  bool isLoadingGroups = false;
+
+  int _totalPhotos = 0;
 
   // Persistent
   int freedBytes = 0;
@@ -40,6 +50,12 @@ class AppProvider extends ChangeNotifier {
     isPro = prefs.getBool('is_pro') ?? false;
     remindersEnabled = prefs.getBool('reminders_enabled') ?? true;
     notifyListeners();
+
+    // Only gather ad consent / initialize ads for non-Pro users. Pro users get
+    // no ads, so there's no need to show them a consent form at all.
+    if (adsEnabled) {
+      AdService.instance.init();
+    }
 
     // Set up in-app purchases; unlock Pro when a purchase/restore completes.
     PurchaseService.instance.init(onPurchased: () => setPro(true));
@@ -84,10 +100,11 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Permission + Load ────────────────────────────────────────────────────
 
-  /// Newest photos analyzed first for a fast first paint; the rest run after.
-  static const int _initialBatch = 600;
-
-  Future<void> loadPhotos() async {
+  /// Lightweight startup: ask for permission and read only the photo *count*
+  /// (metadata, very fast). We do NOT load every photo or build groups here —
+  /// that heavy work is deferred until the user actually enters a cleanup mode
+  /// (see [ensureGroups]), which keeps app start snappy even with 10k+ photos.
+  Future<void> prepare() async {
     state = AppState.loading;
     notifyListeners();
 
@@ -99,27 +116,44 @@ class AppProvider extends ChangeNotifier {
     }
 
     try {
-      final all = await _service.loadAllAssets();
-
-      // Phase 1: group just the newest photos and show them immediately.
-      final firstWindow =
-          all.length > _initialBatch ? all.sublist(0, _initialBatch) : all;
-      groups = await _service.groupAssets(firstWindow);
-      stats = _service.estimateStats(all.length, groups);
+      _totalPhotos = await _service.totalCount();
+      stats = _service.estimateStats(_totalPhotos, groups);
       state = AppState.ready;
       notifyListeners();
-
-      // Phase 2: scan the remaining photos in the background, then update.
-      if (all.length > _initialBatch) {
-        final full = await _service.groupAssets(all);
-        groups = full;
-        stats = _service.estimateStats(all.length, full);
-        notifyListeners();
-      }
     } catch (e) {
       state = AppState.error;
       notifyListeners();
     }
+  }
+
+  /// Load the photo library and group it by time — on demand, and cached so it
+  /// only runs once per scan. Call this when the user opens a cleanup mode
+  /// (group review / swipe). Returns the resulting groups.
+  Future<List<PhotoGroup>> ensureGroups() async {
+    if (groupsLoaded) return groups;
+
+    isLoadingGroups = true;
+    notifyListeners();
+    try {
+      final all = await _service.loadAllAssets();
+      _totalPhotos = all.length;
+      groups = await _service.groupAssets(all);
+      groupsLoaded = true;
+      stats = _service.estimateStats(_totalPhotos, groups);
+    } catch (_) {
+      // Leave groups empty; the caller handles the "nothing to clean" case.
+    } finally {
+      isLoadingGroups = false;
+      notifyListeners();
+    }
+    return groups;
+  }
+
+  /// Re-scan from scratch (clears the cached grouping and refreshes the count).
+  Future<void> refresh() async {
+    groups = [];
+    groupsLoaded = false;
+    await prepare();
   }
 
   // ─── Delete ───────────────────────────────────────────────────────────────
@@ -157,6 +191,10 @@ class AppProvider extends ChangeNotifier {
         })
         .where((g) => g.assets.length >= 2)
         .toList();
+
+    // Keep the library count and stats in sync with what was just removed.
+    _totalPhotos = (_totalPhotos - deletedIds.length).clamp(0, _totalPhotos);
+    stats = _service.estimateStats(_totalPhotos, groups);
 
     notifyListeners();
     return freed;

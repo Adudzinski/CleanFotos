@@ -34,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppProvider>().loadPhotos();
+      context.read<AppProvider>().prepare();
     });
   }
 
@@ -74,6 +74,46 @@ class _HomeScreenState extends State<HomeScreen>
   /// "Refresh" for a fresh scan.)
   void _afterMode(AppProvider provider) {
     if (provider.adsEnabled) AdService.instance.showInterstitial();
+  }
+
+  /// Open a cleanup mode, loading + grouping the photos on demand. If grouping
+  /// hasn't run yet, we show a brief loading dialog while it does (this is the
+  /// only point we touch the whole library), then navigate.
+  Future<void> _openMode(
+    BuildContext context,
+    AppProvider provider,
+    AppStrings s, {
+    required bool swipe,
+  }) async {
+    if (!provider.groupsLoaded) {
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(
+          child: CircularProgressIndicator(color: AppTheme.primary),
+        ),
+      );
+      await provider.ensureGroups();
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // close the loading dialog
+    }
+
+    final groups = provider.groups;
+    if (groups.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(s.allClean)));
+      return;
+    }
+
+    if (!context.mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            swipe ? SwipeScreen(groups: groups) : GroupReviewScreen(groups: groups),
+      ),
+    ).then((_) => _afterMode(provider));
   }
 
   Widget _buildHeader(
@@ -185,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen>
               textAlign: TextAlign.center),
           const SizedBox(height: 48),
           ElevatedButton.icon(
-            onPressed: () => provider.loadPhotos(),
+            onPressed: () => provider.prepare(),
             icon: const Icon(Icons.search_rounded, size: 22),
             label: Text(s.startAnalysis),
           ),
@@ -235,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen>
               textAlign: TextAlign.center),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () => provider.loadPhotos(),
+            onPressed: () => provider.prepare(),
             child: Text(s.retry),
           ),
         ],
@@ -272,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen>
                 context,
                 icon: Icons.content_copy_outlined,
                 label: s.similarGroups,
-                value: '$groupCount',
+                value: provider.groupsLoaded ? '$groupCount' : '—',
                 color: AppTheme.secondary,
               ),
             ],
@@ -292,7 +332,9 @@ class _HomeScreenState extends State<HomeScreen>
                 context,
                 icon: Icons.savings_outlined,
                 label: s.couldSave,
-                value: provider.stats.savingsFormatted,
+                value: provider.groupsLoaded
+                    ? provider.stats.savingsFormatted
+                    : '—',
                 color: AppTheme.success,
               ),
             ],
@@ -304,38 +346,34 @@ class _HomeScreenState extends State<HomeScreen>
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 16),
 
-          // Group review mode
-          _buildModeCard(
-            context,
-            icon: Icons.grid_view_rounded,
-            title: s.groupMode,
-            subtitle: s.groupModeDesc,
-            color: AppTheme.primary,
-            enabled: groupCount > 0,
-            onTap: () => Navigator.push(
+          // The modes load + group photos on demand (see _openMode), so they're
+          // available as soon as the library has photos — no upfront scan.
+          if (!provider.groupsLoaded || groupCount > 0) ...[
+            // Group review mode
+            _buildModeCard(
               context,
-              MaterialPageRoute(
-                  builder: (_) => GroupReviewScreen(groups: provider.groups)),
-            ).then((_) => _afterMode(provider)),
-          ),
-          const SizedBox(height: 14),
+              icon: Icons.grid_view_rounded,
+              title: s.groupMode,
+              subtitle: s.groupModeDesc,
+              color: AppTheme.primary,
+              enabled: provider.stats.totalPhotos > 0,
+              onTap: () => _openMode(context, provider, s, swipe: false),
+            ),
+            const SizedBox(height: 14),
 
-          // Swipe mode
-          _buildModeCard(
-            context,
-            icon: Icons.swipe_rounded,
-            title: s.swipeMode,
-            subtitle: s.swipeModeDesc,
-            color: AppTheme.secondary,
-            enabled: groupCount > 0,
-            onTap: () => Navigator.push(
+            // Swipe mode
+            _buildModeCard(
               context,
-              MaterialPageRoute(
-                  builder: (_) => SwipeScreen(groups: provider.groups)),
-            ).then((_) => _afterMode(provider)),
-          ),
+              icon: Icons.swipe_rounded,
+              title: s.swipeMode,
+              subtitle: s.swipeModeDesc,
+              color: AppTheme.secondary,
+              enabled: provider.stats.totalPhotos > 0,
+              onTap: () => _openMode(context, provider, s, swipe: true),
+            ),
+          ],
 
-          if (groupCount == 0) ...[
+          if (provider.groupsLoaded && groupCount == 0) ...[
             const SizedBox(height: 32),
             Center(
               child: Column(
@@ -355,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen>
 
           // Refresh
           OutlinedButton.icon(
-            onPressed: () => provider.loadPhotos(),
+            onPressed: () => provider.refresh(),
             icon: const Icon(Icons.refresh_rounded),
             label: Text(s.refresh),
             style: OutlinedButton.styleFrom(
@@ -404,22 +442,22 @@ class _HomeScreenState extends State<HomeScreen>
                 Text(s.freedSpace,
                     style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500)),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(
                   provider.freedFormatted,
                   style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 28,
+                      fontSize: 30,
                       fontWeight: FontWeight.w800),
                 ),
                 Text(
                   '${s.deletedPhotos}: ${provider.deletedCount}',
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.85),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400),
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -453,19 +491,19 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 22),
+            Icon(icon, color: color, size: 24),
             const SizedBox(height: 8),
             Text(value,
                 style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 26,
                     fontWeight: FontWeight.w800,
                     color: color)),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(label,
                 style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 15,
                     color: AppTheme.textSecondary,
-                    fontWeight: FontWeight.w500)),
+                    fontWeight: FontWeight.w600)),
           ],
         ),
       ),

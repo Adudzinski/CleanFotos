@@ -115,6 +115,7 @@ class AppStrings {
       'App Store Optimization + positive ratings drive organic installs.';
   String get about => 'About';
   String get privacyPolicy => 'Privacy Policy';
+  String get privacyOptions => 'Ad privacy options';
   String get appVersion => 'Version';
   String get buildWith => 'Built with';
   String get developerTip => 'Tip for launch';
@@ -196,6 +197,7 @@ class _SpanishStrings extends AppStrings {
   @override String get tip4 => 'ASO + valoraciones positivas = más descargas.';
   @override String get about => 'Acerca de';
   @override String get privacyPolicy => 'Política de privacidad';
+  @override String get privacyOptions => 'Opciones de privacidad de anuncios';
   @override String get appVersion => 'Versión';
   @override String get buildWith => 'Creado con';
   @override String get developerTip => 'Consejo';
@@ -271,6 +273,7 @@ class _GermanStrings extends AppStrings {
   @override String get tip4 => 'ASO + gute Bewertungen = mehr Downloads.';
   @override String get about => 'Über';
   @override String get privacyPolicy => 'Datenschutz';
+  @override String get privacyOptions => 'Datenschutzoptionen für Werbung';
   @override String get appVersion => 'Version';
   @override String get buildWith => 'Erstellt mit';
   @override String get developerTip => 'Tipp';
@@ -346,6 +349,7 @@ class _FrenchStrings extends AppStrings {
   @override String get tip4 => 'ASO + avis positifs = plus de téléchargements.';
   @override String get about => 'À propos';
   @override String get privacyPolicy => 'Politique de confidentialité';
+  @override String get privacyOptions => 'Options de confidentialité des annonces';
   @override String get appVersion => 'Version';
   @override String get buildWith => 'Créé avec';
   @override String get developerTip => 'Conseil';
@@ -421,6 +425,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get tip4 => 'ASO + avaliações positivas = mais downloads.';
   @override String get about => 'Sobre';
   @override String get privacyPolicy => 'Política de privacidade';
+  @override String get privacyOptions => 'Opções de privacidade de anúncios';
   @override String get appVersion => 'Versão';
   @override String get buildWith => 'Criado com';
   @override String get developerTip => 'Dica';
@@ -496,6 +501,7 @@ class _ItalianStrings extends AppStrings {
   @override String get tip4 => 'ASO + recensioni positive = più download.';
   @override String get about => 'Informazioni';
   @override String get privacyPolicy => 'Informativa sulla privacy';
+  @override String get privacyOptions => 'Opzioni privacy degli annunci';
   @override String get appVersion => 'Versione';
   @override String get buildWith => 'Creato con';
   @override String get developerTip => 'Consiglio';

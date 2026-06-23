@@ -1,24 +1,15 @@
-import 'dart:typed_data';
-import 'package:image/image.dart' as img;
 import 'package:photo_manager/photo_manager.dart';
 import '../models/photo_group.dart';
 
-/// Loads photos and groups similar ones together.
+/// Loads photos and groups them **purely by capture time** — no file reads and
+/// no image decoding. This keeps analysis fast and light even for libraries
+/// with tens of thousands of photos.
 ///
-/// **Fast by design:** grouping uses only photo metadata (capture time) — it
-/// does NOT read photo files, which on Android means copying each file and is
-/// very slow. Sizes are estimated ([kAvgPhotoBytes]); the visual hash is only
-/// used to split unusually large bursts.
+/// Photos taken within [timeWindowSeconds] of each other are treated as the
+/// same moment (a burst / near-identical shot) and grouped together.
 class PhotoService {
-  /// Photos within this many minutes are treated as the same moment.
-  static const int timeWindowMinutes = 5;
-
-  /// Only run the visual hash when a time cluster is larger than this.
-  static const int visualSplitThreshold = 12;
-
-  /// dHash is 64 bits; two photos are "similar" if at most this many bits
-  /// differ (lenient → keeps groups together).
-  static const int maxHammingDistance = 20;
+  /// Photos taken within this many seconds of each other are grouped.
+  static const int timeWindowSeconds = 30;
 
   /// Safety cap on how many photos to scan.
   static const int maxPhotosToScan = 50000;
@@ -29,6 +20,17 @@ class PhotoService {
     final state = await PhotoManager.requestPermissionExtend();
     return state == PermissionState.authorized ||
         state == PermissionState.limited;
+  }
+
+  /// Total number of image assets (metadata only — very fast). Used to show
+  /// library stats on the home screen without loading every photo.
+  Future<int> totalCount() async {
+    final albums = await PhotoManager.getAssetPathList(
+      type: RequestType.image,
+    );
+    if (albums.isEmpty) return 0;
+    final count = await albums.first.assetCountAsync;
+    return count < maxPhotosToScan ? count : maxPhotosToScan;
   }
 
   /// Load all image assets (metadata only — fast), newest first.
@@ -51,37 +53,46 @@ class PhotoService {
     return all.getAssetListRange(start: 0, end: end);
   }
 
-  /// Group assets by time, refining only large bursts with a visual hash.
-  /// No file reads → fast. [assets] need not be pre-sorted.
+  /// Group assets by capture time. No file reads, no decoding → fast.
+  /// [assets] need not be pre-sorted.
   Future<List<PhotoGroup>> groupAssets(List<AssetEntity> assets) async {
     if (assets.isEmpty) return [];
 
     final sorted = [...assets]
       ..sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
 
-    // Time-window clustering (the primary signal).
-    final List<List<AssetEntity>> timeClusters = [];
+    final List<PhotoGroup> groups = [];
     List<AssetEntity> current = [sorted.first];
+    int gi = 0;
+
+    void flush() {
+      // A "group" only makes sense with at least two near-simultaneous photos.
+      if (current.length >= 2) {
+        groups.add(PhotoGroup(
+          id: 'group_$gi',
+          assets: List.of(current),
+          groupDate: current.first.createDateTime,
+          sizeBytes: current.length * kAvgPhotoBytes,
+          similarityScore: 0.95,
+        ));
+        gi++;
+      }
+    }
+
     for (int i = 1; i < sorted.length; i++) {
       final diff = current.last.createDateTime
           .difference(sorted[i].createDateTime)
           .abs();
-      if (diff.inMinutes <= timeWindowMinutes) {
+      if (diff.inSeconds <= timeWindowSeconds) {
         current.add(sorted[i]);
       } else {
-        if (current.length > 1) timeClusters.add(current);
+        flush();
         current = [sorted[i]];
       }
     }
-    if (current.length > 1) timeClusters.add(current);
+    flush();
 
-    final List<PhotoGroup> groups = [];
-    int gi = 0;
-    for (final cluster in timeClusters) {
-      groups.addAll(await _refineCluster(cluster, gi));
-      gi++;
-    }
-    return groups.where((g) => g.assets.length >= 2).toList();
+    return groups;
   }
 
   /// Estimated library statistics (no file reads).
@@ -96,93 +107,5 @@ class PhotoService {
       duplicateGroups: groups.length,
       potentialSavingsBytes: savings,
     );
-  }
-
-  // ─── Grouping internals ─────────────────────────────────────────────────────
-
-  Future<List<PhotoGroup>> _refineCluster(
-      List<AssetEntity> cluster, int baseIndex) async {
-    // Small/medium clusters: the whole time cluster is one group (no decoding).
-    if (cluster.length <= visualSplitThreshold) {
-      return [
-        PhotoGroup(
-          id: 'group_$baseIndex',
-          assets: cluster,
-          groupDate: cluster.first.createDateTime,
-          sizeBytes: cluster.length * kAvgPhotoBytes,
-          similarityScore: 0.95,
-        ),
-      ];
-    }
-
-    // Large burst: sub-split by a lenient visual hash so unrelated runs don't
-    // collapse into one giant group.
-    final hashes = <String, List<int>?>{};
-    for (final a in cluster) {
-      hashes[a.id] = await _computeDHash(a);
-    }
-
-    final grouped = List<bool>.filled(cluster.length, false);
-    final result = <PhotoGroup>[];
-    int subIdx = 0;
-    for (int i = 0; i < cluster.length; i++) {
-      if (grouped[i]) continue;
-      final group = [cluster[i]];
-      grouped[i] = true;
-      for (int j = i + 1; j < cluster.length; j++) {
-        if (grouped[j]) continue;
-        final ha = hashes[cluster[i].id];
-        final hb = hashes[cluster[j].id];
-        final similar =
-            (ha == null || hb == null) ? true : _hamming(ha, hb) <= maxHammingDistance;
-        if (similar) {
-          group.add(cluster[j]);
-          grouped[j] = true;
-        }
-      }
-      if (group.length >= 2) {
-        result.add(PhotoGroup(
-          id: 'group_${baseIndex}_$subIdx',
-          assets: group,
-          groupDate: group.first.createDateTime,
-          sizeBytes: group.length * kAvgPhotoBytes,
-          similarityScore: 0.85,
-        ));
-        subIdx++;
-      }
-    }
-    return result;
-  }
-
-  /// 64-bit perceptual "difference hash" from a small thumbnail.
-  Future<List<int>?> _computeDHash(AssetEntity asset) async {
-    try {
-      final Uint8List? data =
-          await asset.thumbnailDataWithSize(const ThumbnailSize(72, 72));
-      if (data == null) return null;
-      final decoded = img.decodeImage(data);
-      if (decoded == null) return null;
-      final resized = img.copyResize(decoded, width: 9, height: 8);
-      final bits = <int>[];
-      for (int y = 0; y < 8; y++) {
-        for (int x = 0; x < 8; x++) {
-          final left = img.getLuminance(resized.getPixel(x, y));
-          final right = img.getLuminance(resized.getPixel(x + 1, y));
-          bits.add(left < right ? 1 : 0);
-        }
-      }
-      return bits;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  int _hamming(List<int> a, List<int> b) {
-    if (a.length != b.length) return 64;
-    int d = 0;
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) d++;
-    }
-    return d;
   }
 }

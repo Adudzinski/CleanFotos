@@ -18,6 +18,16 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   @override
   void initState() {
     super.initState();
+    _maybeLoad();
+  }
+
+  /// Ensure ads are initialized (idempotent), wait until consent is resolved,
+  /// then only load if we're allowed to request ads (respects the EEA/UK
+  /// consent choice). Calling init() here avoids a startup race where the
+  /// banner builds before the provider has kicked off ad initialization.
+  Future<void> _maybeLoad() async {
+    await AdService.instance.init();
+    if (!mounted || !AdService.instance.canRequestAds) return;
     _load();
   }
 

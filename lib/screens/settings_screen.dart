@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
+import '../services/ad_service.dart';
 import '../services/purchase_service.dart';
 import '../theme/app_theme.dart';
 import '../l10n/strings.dart';
@@ -48,7 +49,7 @@ class SettingsScreen extends StatelessWidget {
 
           // ── About ─────────────────────────────────────────────────────────
           _sectionHeader(s.about),
-          _aboutCard(context, s),
+          _aboutCard(context, provider, s),
         ],
       ),
     );
@@ -60,7 +61,7 @@ class SettingsScreen extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: const TextStyle(
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
           color: AppTheme.textSecondary,
@@ -152,7 +153,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   Text(lang['name']!,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: selected
                             ? FontWeight.w700
                             : FontWeight.w400,
@@ -186,7 +187,7 @@ class SettingsScreen extends StatelessWidget {
             Expanded(
               child: Text(s.proUnlocked,
                   style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary)),
             ),
@@ -207,13 +208,13 @@ class SettingsScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Text(s.proTitle,
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
+                      fontSize: 18, fontWeight: FontWeight.w700)),
             ],
           ),
           const SizedBox(height: 8),
           Text(s.proDesc,
               style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 15,
                   color: AppTheme.textSecondary,
                   height: 1.4)),
           const SizedBox(height: 14),
@@ -257,11 +258,11 @@ class SettingsScreen extends StatelessWidget {
               children: [
                 Text(s.monthlyReminder,
                     style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600)),
+                        fontSize: 17, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(s.monthlyReminderDesc,
                     style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 15,
                         color: AppTheme.textSecondary,
                         height: 1.4)),
               ],
@@ -278,7 +279,13 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _aboutCard(BuildContext context, AppStrings s) {
+  Widget _aboutCard(
+      BuildContext context, AppProvider provider, AppStrings s) {
+    // The "Ad privacy options" entry is only meaningful for non-Pro users in
+    // regions (EEA/UK) where Google's consent platform requires it.
+    final showPrivacyOptions =
+        !provider.isPro && AdService.instance.isPrivacyOptionsRequired;
+
     return _card(
       child: Column(
         children: [
@@ -292,14 +299,33 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   Text(s.privacyPolicy,
                       style: const TextStyle(
-                          fontSize: 15, color: AppTheme.textSecondary)),
+                          fontSize: 17, color: AppTheme.textSecondary)),
                   const Spacer(),
                   const Icon(Icons.open_in_new,
-                      size: 18, color: AppTheme.textSecondary),
+                      size: 20, color: AppTheme.textSecondary),
                 ],
               ),
             ),
           ),
+          if (showPrivacyOptions) ...[
+            _divider(),
+            InkWell(
+              onTap: () => AdService.instance.showPrivacyOptionsForm(),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    Text(s.privacyOptions,
+                        style: const TextStyle(
+                            fontSize: 17, color: AppTheme.textSecondary)),
+                    const Spacer(),
+                    const Icon(Icons.tune,
+                        size: 20, color: AppTheme.textSecondary),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -321,15 +347,17 @@ class SettingsScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: color),
+          Icon(icon, size: 22, color: color),
           const SizedBox(width: 14),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 15, color: AppTheme.textSecondary)),
-          const Spacer(),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 17, color: AppTheme.textSecondary)),
+          ),
+          const SizedBox(width: 8),
           Text(value,
               style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 18,
                   fontWeight: FontWeight.w700,
                   color: color)),
         ],
@@ -344,11 +372,11 @@ class SettingsScreen extends StatelessWidget {
         children: [
           Text(label,
               style: const TextStyle(
-                  fontSize: 15, color: AppTheme.textSecondary)),
+                  fontSize: 17, color: AppTheme.textSecondary)),
           const Spacer(),
           Text(value,
               style: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w600)),
+                  fontSize: 17, fontWeight: FontWeight.w600)),
         ],
       ),
     );

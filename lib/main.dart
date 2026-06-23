@@ -4,17 +4,14 @@ import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'providers/app_provider.dart';
 import 'screens/home_screen.dart';
-import 'services/ad_service.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize ads (non-fatal if it fails)
-  try {
-    await AdService.instance.init();
-  } catch (_) {}
+  // Ads are initialized later (with the consent flow) by AppProvider, and only
+  // when the user isn't Pro — see AppProvider.init().
 
   // Initialize local notifications (non-fatal if it fails)
   try {
@@ -54,12 +51,14 @@ class CleanPicsApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             home: const HomeScreen(),
             builder: (context, child) {
-              // Ensure font scaling doesn't break layout
+              // Respect the user's OS font-size setting (helps low-vision
+              // users), but never shrink below our design and cap the max so
+              // layouts don't break.
               return MediaQuery(
                 data: MediaQuery.of(context).copyWith(
                     textScaler: MediaQuery.of(context)
                         .textScaler
-                        .clamp(minScaleFactor: 0.9, maxScaleFactor: 1.2)),
+                        .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.4)),
                 child: child!,
               );
             },

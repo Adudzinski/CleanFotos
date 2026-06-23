@@ -20,10 +20,12 @@ These apply regardless of platform.
      PNG, and run it. This generates all Android/iOS icon sizes.
    - The in-app logo placeholder (`auto_awesome` icon) can stay or be replaced.
 
-3. **Real AdMob IDs.** Replace the Google **test** IDs with your own:
-   - App IDs: `android/app/src/main/AndroidManifest.xml` and
-     `ios/Runner/Info.plist` (`GADApplicationIdentifier`).
-   - Unit IDs: `lib/services/ad_service.dart` (banner + interstitial).
+3. **Real AdMob IDs.** ✅ Android done — real App ID in
+   `android/app/src/main/AndroidManifest.xml` and real banner/interstitial unit
+   IDs in `lib/services/ad_service.dart`. iOS still uses test IDs
+   (`ios/Runner/Info.plist` `GADApplicationIdentifier` + the iOS unit IDs in
+   `ad_service.dart`) — fill these in only when you ship iOS. Debug builds always
+   use Google test units regardless.
 
 4. **Create the Pro in-app product.** In each store, create a **non-consumable**
    product with the exact ID `cleanpics_pro` (see `purchase_service.dart`). Set
@@ -34,11 +36,16 @@ These apply regardless of platform.
    Settings. Use this URL in the Play Console data-safety / store-listing forms.
    (Remember to deploy the website so the page is live: `firebase deploy`.)
 
-6. **Ad consent (EU/UK).** Add Google's UMP consent flow (User Messaging
-   Platform) so EU users get a GDPR consent prompt before personalized ads.
-   This is required by AdMob policy for EU traffic.
+6. **Ad consent (EU/UK + US).** ✅ Implemented in code via Google's UMP (User
+   Messaging Platform): consent is gathered before any ad loads, ads are gated on
+   `canRequestAds`, and Settings has an "Ad privacy options" entry for revocation.
+   **Console steps (do these):** in AdMob → Privacy & messaging, create & publish
+   the **GDPR** message and the **US states** message. Use **UMP SDK** deployment
+   (not "ad unit deployment") so the in-app privacy options satisfy the
+   revocation-link requirement. To publish, enable the ad-partner toggles and set
+   the privacy-policy URL on the message.
 
-7. **Bump the version** in `pubspec.yaml` (`version: 1.0.0+1` → name+build).
+7. **Bump the version** in `pubspec.yaml` (currently `1.0.1+2`).
 
 ---
 
@@ -119,18 +126,21 @@ and upload to App Store Connect.
 
 ---
 
-## 3. Go-live checklist (don't ship without these)
+## 3. Go-live checklist (Android — don't ship without these)
 
-- [ ] Real bundle ID (no `com.example`).
-- [ ] Real app icon.
-- [ ] Real AdMob app + unit IDs (test IDs removed).
-- [ ] `cleanpics_pro` product created and priced in both stores.
-- [ ] Release signing configured (Android keystore; iOS team).
-- [ ] Hosted privacy policy URL.
-- [ ] UMP consent flow for EU ads.
-- [ ] Tested on a real device: photos load, delete works, ads show, Pro unlock +
-      restore work.
-- [ ] Store listings, screenshots, content rating / app privacy completed.
+- [x] Real bundle ID (`com.crocodata.cleanpics`).
+- [x] Real app icon + branded splash (no boxed logo on Android 12+).
+- [x] Real AdMob app + unit IDs (Android).
+- [ ] `cleanpics_pro` product created and priced in Play Console.
+- [ ] Release signing configured (Android keystore).
+- [x] Hosted privacy policy URL, linked in Settings.
+- [x] UMP consent flow in code; [ ] GDPR + US messages published in AdMob.
+- [ ] Play Console: Data safety form, photo-permission declaration, app-ads.txt.
+- [ ] Tested on a real device (from a Play track): photos load, delete works,
+      ads show, Pro unlock + restore work.
+- [ ] Store listings, screenshots, content rating / data safety completed.
+
+(iOS is deferred — see section 2 when you're ready.)
 
 ---
 
