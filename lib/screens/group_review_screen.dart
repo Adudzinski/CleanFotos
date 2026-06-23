@@ -197,14 +197,14 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                 s.groupOf(
                     _currentIndex + 1, widget.groups.length),
                 style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textSecondary),
               ),
               Text(
                 '${(progress * 100).toInt()}%',
                 style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.primary),
               ),
@@ -240,7 +240,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                 Text(
                   _formatDate(group.groupDate),
                   style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700),
+                      fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 if (group.location != null) ...[
                   const SizedBox(height: 2),
@@ -251,7 +251,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                       const SizedBox(width: 3),
                       Text(group.location!,
                           style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 16,
                               color: AppTheme.textSecondary)),
                     ],
                   ),
@@ -276,7 +276,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                   Text(
                     s.saveUpTo(group.savingsFormatted),
                     style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: AppTheme.success),
                   ),
@@ -295,7 +295,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
             child: Text(
               s.photosInGroup(totalInGroup),
               style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.primary),
             ),
@@ -354,17 +354,18 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
             hasSelection
                 ? s.tapToDeselect
                 : s.tapToSelectDelete,
+            textAlign: TextAlign.center,
             style: const TextStyle(
-                fontSize: 13,
+                fontSize: 17,
                 color: AppTheme.textSecondary,
-                fontWeight: FontWeight.w500),
+                fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             s.recoverHint,
             textAlign: TextAlign.center,
             style: const TextStyle(
-                fontSize: 11, color: AppTheme.textSecondary),
+                fontSize: 16, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 12),
           Row(
@@ -380,7 +381,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     textStyle: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
+                        fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   child: Text(s.continueBtn),
                 ),
@@ -399,9 +400,9 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     textStyle: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700),
+                        fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-                  icon: const Icon(Icons.delete_outline, size: 20),
+                  icon: const Icon(Icons.delete_outline, size: 22),
                   label: Text(hasSelection
                       ? s.deleteCount(selectedCount)
                       : s.deleteBtn),

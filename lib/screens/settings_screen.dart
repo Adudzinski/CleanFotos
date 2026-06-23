@@ -61,7 +61,7 @@ class SettingsScreen extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: const TextStyle(
-          fontSize: 14,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
           color: AppTheme.textSecondary,
@@ -214,7 +214,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(s.proDesc,
               style: const TextStyle(
-                  fontSize: 15,
+                  fontSize: 16,
                   color: AppTheme.textSecondary,
                   height: 1.4)),
           const SizedBox(height: 14),
@@ -262,7 +262,7 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(s.monthlyReminderDesc,
                     style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 16,
                         color: AppTheme.textSecondary,
                         height: 1.4)),
               ],

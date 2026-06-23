@@ -182,7 +182,7 @@ class _SwipeScreenState extends State<SwipeScreen>
                   '${_queue.length - _current} ${s.remaining}',
                   style: const TextStyle(
                       color: Colors.white70,
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600),
                 ),
               ),
@@ -351,7 +351,7 @@ class _SwipeScreenState extends State<SwipeScreen>
                 _formatDate(asset.createDateTime),
                 style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w500),
               ),
             ),
@@ -369,16 +369,17 @@ class _SwipeScreenState extends State<SwipeScreen>
         children: [
           Text(
             s.swipeHint,
+            textAlign: TextAlign.center,
             style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 14,
+                color: Colors.white70,
+                fontSize: 16,
                 fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
           Text(
             s.recoverHint,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
+            style: const TextStyle(color: Colors.white54, fontSize: 16),
           ),
           const SizedBox(height: 16),
           Row(
@@ -402,7 +403,7 @@ class _SwipeScreenState extends State<SwipeScreen>
                   ),
                   Text(s.deleted_noun,
                       style: const TextStyle(
-                          color: Colors.white54, fontSize: 12)),
+                          color: Colors.white54, fontSize: 16)),
                 ],
               ),
               _buildActionBtn(

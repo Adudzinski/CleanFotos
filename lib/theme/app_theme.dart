@@ -64,7 +64,7 @@ class AppTheme {
           color: textPrimary,
         ),
         bodyMedium: TextStyle(
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: FontWeight.w400,
           color: textSecondary,
         ),

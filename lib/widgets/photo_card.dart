@@ -172,7 +172,7 @@ class PhotoDetailDialog extends StatelessWidget {
       child: Text(
         dateStr,
         style: const TextStyle(
-            color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+            color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
       ),
     );
   }

@@ -456,8 +456,8 @@ class _HomeScreenState extends State<HomeScreen>
                   '${s.deletedPhotos}: ${provider.deletedCount}',
                   style: TextStyle(
                       color: Colors.white.withOpacity(0.9),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -501,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 4),
             Text(label,
                 style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 16,
                     color: AppTheme.textSecondary,
                     fontWeight: FontWeight.w600)),
           ],
@@ -559,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 4),
                     Text(subtitle,
                         style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 16,
                             color: AppTheme.textSecondary,
                             height: 1.4)),
                   ],
