@@ -259,47 +259,6 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
               ],
             ),
           ),
-          if (group.savingsBytes > 0) ...[
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppTheme.success.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.savings_outlined,
-                      size: 15, color: AppTheme.success),
-                  const SizedBox(width: 5),
-                  Text(
-                    s.saveUpTo(group.savingsFormatted),
-                    style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.success),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              s.photosInGroup(totalInGroup),
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.primary),
-            ),
-          ),
         ],
       ),
     );
@@ -372,18 +331,20 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
             children: [
               // Continue / Skip
               Expanded(
-                child: OutlinedButton(
+                child: ElevatedButton.icon(
                   onPressed: _skipGroup,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(54),
-                    foregroundColor: AppTheme.textSecondary,
-                    side: const BorderSide(color: AppTheme.textSecondary),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(56),
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     textStyle: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-                  child: Text(s.continueBtn),
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 22),
+                  label: Text(s.continueBtn),
                 ),
               ),
               const SizedBox(width: 12),
@@ -393,10 +354,12 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                 child: ElevatedButton.icon(
                   onPressed: hasSelection ? _deleteSelected : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: hasSelection
-                        ? AppTheme.danger
-                        : AppTheme.danger.withOpacity(0.4),
-                    minimumSize: const Size.fromHeight(54),
+                    backgroundColor: AppTheme.danger,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.danger.withOpacity(0.4),
+                    disabledForegroundColor: Colors.white70,
+                    minimumSize: const Size.fromHeight(56),
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     textStyle: const TextStyle(

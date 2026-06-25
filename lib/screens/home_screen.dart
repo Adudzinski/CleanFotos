@@ -297,7 +297,72 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 20),
           ],
 
-          // Stats row
+          // ── Cleanup actions (front and center) ───────────────────────────
+          // The modes load + group photos on demand (see _openMode), so they're
+          // available as soon as the library has photos — no upfront scan.
+          if (!provider.groupsLoaded || groupCount > 0) ...[
+            // Group review mode
+            _buildModeCard(
+              context,
+              icon: Icons.grid_view_rounded,
+              title: s.groupMode,
+              subtitle: s.groupModeDesc,
+              gradient: const [AppTheme.primary, AppTheme.primaryDark],
+              enabled: provider.stats.totalPhotos > 0,
+              onTap: () => _openMode(context, provider, s, swipe: false),
+            ),
+            const SizedBox(height: 14),
+
+            // Swipe mode
+            _buildModeCard(
+              context,
+              icon: Icons.swipe_rounded,
+              title: s.swipeMode,
+              subtitle: s.swipeModeDesc,
+              gradient: const [AppTheme.secondary, Color(0xFFE84A6F)],
+              enabled: provider.stats.totalPhotos > 0,
+              onTap: () => _openMode(context, provider, s, swipe: true),
+            ),
+          ],
+
+          if (provider.groupsLoaded && groupCount == 0) ...[
+            const SizedBox(height: 20),
+            Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.check_circle_outline,
+                      size: 64, color: AppTheme.success),
+                  const SizedBox(height: 16),
+                  Text(s.allClean,
+                      style: Theme.of(context).textTheme.headlineMedium,
+                      textAlign: TextAlign.center),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          // Refresh (beneath the two mode buttons)
+          OutlinedButton.icon(
+            onPressed: () => provider.refresh(),
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(s.refresh),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 52),
+              foregroundColor: AppTheme.primary,
+              side: const BorderSide(color: AppTheme.primary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              textStyle: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+
+          const SizedBox(height: 28),
+
+          // ── Stats (below the actions) ─────────────────────────────────────
           Row(
             children: [
               _buildStatCard(
@@ -338,74 +403,6 @@ class _HomeScreenState extends State<HomeScreen>
                 color: AppTheme.success,
               ),
             ],
-          ),
-
-          const SizedBox(height: 32),
-
-          Text(s.chooseMode,
-              style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 16),
-
-          // The modes load + group photos on demand (see _openMode), so they're
-          // available as soon as the library has photos — no upfront scan.
-          if (!provider.groupsLoaded || groupCount > 0) ...[
-            // Group review mode
-            _buildModeCard(
-              context,
-              icon: Icons.grid_view_rounded,
-              title: s.groupMode,
-              subtitle: s.groupModeDesc,
-              color: AppTheme.primary,
-              enabled: provider.stats.totalPhotos > 0,
-              onTap: () => _openMode(context, provider, s, swipe: false),
-            ),
-            const SizedBox(height: 14),
-
-            // Swipe mode
-            _buildModeCard(
-              context,
-              icon: Icons.swipe_rounded,
-              title: s.swipeMode,
-              subtitle: s.swipeModeDesc,
-              color: AppTheme.secondary,
-              enabled: provider.stats.totalPhotos > 0,
-              onTap: () => _openMode(context, provider, s, swipe: true),
-            ),
-          ],
-
-          if (provider.groupsLoaded && groupCount == 0) ...[
-            const SizedBox(height: 32),
-            Center(
-              child: Column(
-                children: [
-                  const Icon(Icons.check_circle_outline,
-                      size: 64, color: AppTheme.success),
-                  const SizedBox(height: 16),
-                  Text(s.allClean,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                      textAlign: TextAlign.center),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 30),
-
-          // Refresh
-          OutlinedButton.icon(
-            onPressed: () => provider.refresh(),
-            icon: const Icon(Icons.refresh_rounded),
-            label: Text(s.refresh),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 52),
-              foregroundColor: AppTheme.primary,
-              side: const BorderSide(color: AppTheme.primary),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              textStyle: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w600),
-            ),
           ),
         ],
       ),
@@ -494,10 +491,10 @@ class _HomeScreenState extends State<HomeScreen>
             Icon(icon, color: color, size: 24),
             const SizedBox(height: 8),
             Text(value,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
-                    color: color)),
+                    color: AppTheme.textPrimary)),
             const SizedBox(height: 4),
             Text(label,
                 style: const TextStyle(
@@ -515,7 +512,7 @@ class _HomeScreenState extends State<HomeScreen>
     required IconData icon,
     required String title,
     required String subtitle,
-    required Color color,
+    required List<Color> gradient,
     required bool enabled,
     required VoidCallback onTap,
   }) {
@@ -527,26 +524,30 @@ class _HomeScreenState extends State<HomeScreen>
         child: Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.12),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                color: gradient.first.withOpacity(0.4),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
           child: Row(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: Colors.white.withOpacity(0.22),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: color, size: 30),
+                child: Icon(icon, color: Colors.white, size: 32),
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -555,18 +556,20 @@ class _HomeScreenState extends State<HomeScreen>
                   children: [
                     Text(title,
                         style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w700)),
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white)),
                     const SizedBox(height: 4),
                     Text(subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 16,
-                            color: AppTheme.textSecondary,
+                            color: Colors.white.withOpacity(0.9),
                             height: 1.4)),
                   ],
                 ),
               ),
               Icon(Icons.arrow_forward_ios_rounded,
-                  color: color, size: 20),
+                  color: Colors.white.withOpacity(0.9), size: 22),
             ],
           ),
         ),

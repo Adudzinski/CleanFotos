@@ -28,7 +28,6 @@ class AppStrings {
       'CleanPics finds your duplicate & similar photos and helps you delete them fast.';
   String get startAnalysis => 'Analyze My Photos';
   String get analyzingPhotos => 'Analyzing your photos…';
-  String get chooseMode => 'Choose mode';
   String get refresh => 'Refresh';
   String get allClean => 'All clean! 🎉';
 
@@ -38,7 +37,7 @@ class AppStrings {
       'See 4 similar photos at once and tap to delete.';
   String get swipeMode => 'Swipe Mode';
   String get swipeModeDesc =>
-      'Swipe left to delete, right to keep — like Tinder.';
+      'Swipe left to delete, right to keep.';
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   String get totalPhotos => 'Total Photos';
@@ -137,7 +136,6 @@ class _SpanishStrings extends AppStrings {
       'CleanPics encuentra tus fotos duplicadas y similares y te ayuda a eliminarlas rápido.';
   @override String get startAnalysis => 'Analizar mis fotos';
   @override String get analyzingPhotos => 'Analizando tus fotos…';
-  @override String get chooseMode => 'Elige modo';
   @override String get refresh => 'Actualizar';
   @override String get allClean => 'Todo limpio! 🎉';
   @override String get groupMode => 'Revisar grupos';
@@ -213,10 +211,9 @@ class _GermanStrings extends AppStrings {
       'CleanPics findet doppelte und ähnliche Fotos und hilft dir, sie schnell zu löschen.';
   @override String get startAnalysis => 'Fotos analysieren';
   @override String get analyzingPhotos => 'Fotos werden analysiert…';
-  @override String get chooseMode => 'Modus wählen';
   @override String get refresh => 'Aktualisieren';
   @override String get allClean => 'Alles sauber! 🎉';
-  @override String get groupMode => 'Gruppen-Überprüfung';
+  @override String get groupMode => 'Gruppen ansehen';
   @override String get groupModeDesc => '4 ähnliche Fotos gleichzeitig anzeigen und zum Löschen tippen.';
   @override String get swipeMode => 'Wischen-Modus';
   @override String get swipeModeDesc => 'Links wischen zum Löschen, rechts zum Behalten.';
@@ -289,7 +286,6 @@ class _FrenchStrings extends AppStrings {
       'CleanPics trouve vos photos similaires et vous aide à les supprimer rapidement.';
   @override String get startAnalysis => 'Analyser mes photos';
   @override String get analyzingPhotos => 'Analyse en cours…';
-  @override String get chooseMode => 'Choisir un mode';
   @override String get refresh => 'Actualiser';
   @override String get allClean => 'Tout est propre ! 🎉';
   @override String get groupMode => 'Révision par groupe';
@@ -365,7 +361,6 @@ class _PortugueseStrings extends AppStrings {
       'CleanPics encontra fotos duplicadas e similares e ajuda você a deletá-las rapidamente.';
   @override String get startAnalysis => 'Analisar minhas fotos';
   @override String get analyzingPhotos => 'Analisando fotos…';
-  @override String get chooseMode => 'Escolha o modo';
   @override String get refresh => 'Atualizar';
   @override String get allClean => 'Tudo limpo! 🎉';
   @override String get groupMode => 'Revisão em grupo';
@@ -441,7 +436,6 @@ class _ItalianStrings extends AppStrings {
       'CleanPics trova le tue foto duplicate e simili e ti aiuta a eliminarle velocemente.';
   @override String get startAnalysis => 'Analizza le mie foto';
   @override String get analyzingPhotos => 'Analisi in corso…';
-  @override String get chooseMode => 'Scegli modalità';
   @override String get refresh => 'Aggiorna';
   @override String get allClean => 'Tutto pulito! 🎉';
   @override String get groupMode => 'Revisione per gruppo';

@@ -57,6 +57,14 @@ android {
                 signingConfigs.getByName("release")
             else
                 signingConfigs.getByName("debug")
+
+            // Keep R8 from stripping/obfuscating classes that plugins load
+            // reflectively. androidx.work (pulled in transitively and started by
+            // androidx.startup.InitializationProvider) needs its Room database
+            // impl classes; minification was removing them, crashing the app on
+            // launch with "Failed to create an instance of WorkDatabase".
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
