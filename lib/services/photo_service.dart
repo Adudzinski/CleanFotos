@@ -9,7 +9,9 @@ import '../models/photo_group.dart';
 /// same moment (a burst / near-identical shot) and grouped together.
 class PhotoService {
   /// Photos taken within this many seconds of each other are grouped.
-  static const int timeWindowSeconds = 30;
+  /// 3 minutes: loose enough to catch "retook the same shot a couple times"
+  /// without chaining a whole outing into one giant group.
+  static const int timeWindowSeconds = 180;
 
   /// Safety cap on how many photos to scan.
   static const int maxPhotosToScan = 50000;

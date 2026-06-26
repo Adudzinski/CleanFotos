@@ -68,8 +68,9 @@ class AdService {
   Future<void> _init() async {
     await _gatherConsent();
     await MobileAds.instance.initialize();
-    // Start the cooldown now so the user gets an ad-free first few minutes.
-    _lastInterstitial = DateTime.now();
+    // Note: we intentionally do NOT seed _lastInterstitial here, so the first
+    // completed cleanup can show an interstitial. The cooldown then spaces out
+    // every subsequent one.
     if (_canRequestAds) _loadInterstitial();
   }
 

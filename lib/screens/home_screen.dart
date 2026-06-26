@@ -291,12 +291,6 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Freed space banner
-          if (provider.freedBytes > 0) ...[
-            _buildFreedBanner(context, provider, s),
-            const SizedBox(height: 20),
-          ],
-
           // ── Cleanup actions (front and center) ───────────────────────────
           // The modes load + group photos on demand (see _openMode), so they're
           // available as soon as the library has photos — no upfront scan.
@@ -362,6 +356,10 @@ class _HomeScreenState extends State<HomeScreen>
 
           const SizedBox(height: 28),
 
+          // Lifetime saved summary (above the stats, neutral stat-card style)
+          _buildSavedSummary(context, provider, s),
+          const SizedBox(height: 14),
+
           // ── Stats (below the actions) ─────────────────────────────────────
           Row(
             children: [
@@ -409,28 +407,28 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildFreedBanner(
+  /// Wide "how much you've saved" card. Always visible, styled to match the
+  /// neutral stat cards below it (white surface, soft shadow) but full-width,
+  /// with a celebratory icon so the user feels good about what they've cleaned.
+  Widget _buildSavedSummary(
       BuildContext context, AppProvider provider, AppStrings s) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppTheme.success, Color(0xFF2DC66B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.success.withOpacity(0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: AppTheme.success.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Row(
         children: [
-          const Text('🎉', style: TextStyle(fontSize: 36)),
+          const Text('🎉', style: TextStyle(fontSize: 34)),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -438,23 +436,24 @@ class _HomeScreenState extends State<HomeScreen>
               children: [
                 Text(s.freedSpace,
                     style: const TextStyle(
-                        color: Colors.white,
                         fontSize: 16,
-                        fontWeight: FontWeight.w600)),
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary)),
                 const SizedBox(height: 4),
                 Text(
                   provider.freedFormatted,
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w800),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   '${s.deletedPhotos}: ${provider.deletedCount}',
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary),
                 ),
               ],
             ),
