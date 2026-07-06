@@ -4,6 +4,9 @@ import 'package:photo_manager/photo_manager.dart';
 /// never have to read photo files (which is slow on Android).
 const int kAvgPhotoBytes = 3670016;
 
+/// Average video size used for fast freed-space estimates (~30 MB).
+const int kAvgVideoBytes = 31457280;
+
 /// A group of visually/temporally similar photos.
 class PhotoGroup {
   final String id;

@@ -32,12 +32,18 @@ class AppStrings {
   String get allClean => 'All clean! 🎉';
 
   // ── Modes ─────────────────────────────────────────────────────────────────
+  String get coachNext => 'Next';
+  String get coachDone => 'Got it';
   String get groupMode => 'Group Review';
   String get groupModeDesc =>
       'See 4 similar photos at once and tap to delete.';
-  String get swipeMode => 'Swipe Mode';
+  String get swipeMode => 'Picture Swipe';
   String get swipeModeDesc =>
       'Swipe left to delete, right to keep.';
+  String get videoMode => 'Video Swipe';
+  String get videoModeDesc =>
+      'Swipe left to delete, right to keep, hold to preview.';
+  String get swipeAnyToContinue => 'Swipe either way to continue';
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   String get totalPhotos => 'Total Photos';
@@ -67,6 +73,8 @@ class AppStrings {
   String get backHome => 'Back to Home';
   String get recoverHint =>
       'Deleted photos stay in your phone\'s "Recently Deleted" for ~30 days.';
+  String get sponsored => 'Sponsored';
+  String get adSwipeHint => 'Swipe either way to continue';
 
   // ── Celebration ───────────────────────────────────────────────────────────
   String deleted(int n, String size) => '$n photo${n == 1 ? '' : 's'} deleted · $size freed!';
@@ -76,6 +84,10 @@ class AppStrings {
   String get permissionBody =>
       'CleanPics needs access to your photos to find duplicates. Please grant permission in Settings.';
   String get openSettings => 'Open Settings';
+  String get videoAccessTitle => 'Allow video access';
+  String get videoAccessBody =>
+      'To clean up videos, CleanPics needs access to all your videos. Open Settings and set "Photos and videos" to Allow all.';
+  String get notNow => 'Not now';
 
   // ── Error ─────────────────────────────────────────────────────────────────
   String get errorMessage => 'Something went wrong';
@@ -83,6 +95,10 @@ class AppStrings {
 
   // ── Settings ──────────────────────────────────────────────────────────────
   String get settings => 'Settings';
+  String get cleanappsPromoTitle => 'Try CleanApps';
+  String get cleanappsPromoSubtitle =>
+      'Swipe away the apps you never use and free up even more space.';
+  String get cleanappsPromoCta => 'Get it';
   String get statistics => 'Statistics';
   String get language => 'Language';
   String get reminders => 'Reminders';
@@ -94,6 +110,7 @@ class AppStrings {
       'Free up space — review your similar photos in CleanPics.';
   String get monetization => 'Monetization';
   String get removeAds => 'Remove Ads';
+  String get homeProCta => 'Remove Ads with CleanPics Pro';
   String get proTitle => 'CleanPics Pro';
   String get proDesc => 'Remove all ads forever with a one-time purchase.';
   String proButton(String price) => 'Remove Ads · $price';
@@ -138,10 +155,15 @@ class _SpanishStrings extends AppStrings {
   @override String get analyzingPhotos => 'Analizando tus fotos…';
   @override String get refresh => 'Actualizar';
   @override String get allClean => 'Todo limpio! 🎉';
+  @override String get coachNext => 'Siguiente';
+  @override String get coachDone => 'Entendido';
   @override String get groupMode => 'Revisar grupos';
   @override String get groupModeDesc => 'Ve 4 fotos similares a la vez y toca para borrar.';
-  @override String get swipeMode => 'Modo swipe';
+  @override String get swipeMode => 'Deslizar fotos';
   @override String get swipeModeDesc => 'Desliza izquierda para borrar, derecha para conservar.';
+  @override String get videoMode => 'Deslizar videos';
+  @override String get videoModeDesc => 'Desliza izquierda para borrar, derecha para conservar, mantén para ver.';
+  @override String get swipeAnyToContinue => 'Desliza en cualquier dirección para continuar';
   @override String get totalPhotos => 'Total fotos';
   @override String get similarGroups => 'Grupos similares';
   @override String get librarySize => 'Tamaño';
@@ -163,13 +185,21 @@ class _SpanishStrings extends AppStrings {
   @override String get deleted_noun => 'borradas';
   @override String get backHome => 'Volver';
   @override String get recoverHint => 'Las fotos borradas quedan en "Eliminadas recientemente" del teléfono ~30 días.';
+  @override String get sponsored => 'Publicidad';
+  @override String get adSwipeHint => 'Desliza en cualquier dirección para continuar';
   @override String deleted(int n, String size) => '${n} foto${n == 1 ? '' : 's'} eliminada${n == 1 ? '' : 's'} · ¡$size liberado!';
   @override String get permissionTitle => 'Acceso a fotos requerido';
   @override String get permissionBody => 'CleanPics necesita acceso a tus fotos.';
   @override String get openSettings => 'Abrir ajustes';
+  @override String get videoAccessTitle => 'Permitir acceso a videos';
+  @override String get videoAccessBody => 'Para limpiar videos, CleanPics necesita acceso a todos tus videos. Abre Ajustes y pon "Fotos y videos" en Permitir todo.';
+  @override String get notNow => 'Ahora no';
   @override String get errorMessage => 'Algo salió mal';
   @override String get retry => 'Reintentar';
   @override String get settings => 'Ajustes';
+  @override String get cleanappsPromoTitle => 'Prueba CleanApps';
+  @override String get cleanappsPromoSubtitle => 'Desliza para desinstalar apps que no usas y libera aún más espacio.';
+  @override String get cleanappsPromoCta => 'Obtener';
   @override String get statistics => 'Estadísticas';
   @override String get language => 'Idioma';
   @override String get reminders => 'Recordatorios';
@@ -180,6 +210,7 @@ class _SpanishStrings extends AppStrings {
   @override String get monetization => 'Monetización';
   @override String saveUpTo(String size) => 'Ahorra ~$size';
   @override String get removeAds => 'Quitar anuncios';
+  @override String get homeProCta => 'Quita los anuncios con CleanPics Pro';
   @override String get proTitle => 'CleanPics Pro';
   @override String get proDesc => 'Elimina todos los anuncios para siempre con una compra única.';
   @override String proButton(String price) => 'Quitar anuncios · $price';
@@ -213,10 +244,15 @@ class _GermanStrings extends AppStrings {
   @override String get analyzingPhotos => 'Fotos werden analysiert…';
   @override String get refresh => 'Aktualisieren';
   @override String get allClean => 'Alles sauber! 🎉';
+  @override String get coachNext => 'Weiter';
+  @override String get coachDone => 'Verstanden';
   @override String get groupMode => 'Gruppen ansehen';
   @override String get groupModeDesc => '4 ähnliche Fotos gleichzeitig anzeigen und zum Löschen tippen.';
-  @override String get swipeMode => 'Wischen-Modus';
+  @override String get swipeMode => 'Bilder wischen';
   @override String get swipeModeDesc => 'Links wischen zum Löschen, rechts zum Behalten.';
+  @override String get videoMode => 'Videos wischen';
+  @override String get videoModeDesc => 'Links wischen zum Löschen, rechts zum Behalten, halten zum Ansehen.';
+  @override String get swipeAnyToContinue => 'In beide Richtungen wischen zum Fortfahren';
   @override String get totalPhotos => 'Fotos gesamt';
   @override String get similarGroups => 'Ähnliche Gruppen';
   @override String get librarySize => 'Bibliotheksgröße';
@@ -238,13 +274,21 @@ class _GermanStrings extends AppStrings {
   @override String get deleted_noun => 'gelöscht';
   @override String get backHome => 'Zurück';
   @override String get recoverHint => 'Gelöschte Fotos bleiben ~30 Tage im Ordner „Zuletzt gelöscht" deines Handys.';
+  @override String get sponsored => 'Anzeige';
+  @override String get adSwipeHint => 'Wische in eine Richtung, um fortzufahren';
   @override String deleted(int n, String size) => '$n Foto${n == 1 ? '' : 's'} gelöscht · $size freigegeben!';
   @override String get permissionTitle => 'Fotozugriff erforderlich';
   @override String get permissionBody => 'CleanPics benötigt Zugriff auf deine Fotos.';
   @override String get openSettings => 'Einstellungen öffnen';
+  @override String get videoAccessTitle => 'Videozugriff erlauben';
+  @override String get videoAccessBody => 'Um Videos aufzuräumen, benötigt CleanPics Zugriff auf alle deine Videos. Öffne die Einstellungen und stelle „Fotos und Videos" auf Alle zulassen.';
+  @override String get notNow => 'Nicht jetzt';
   @override String get errorMessage => 'Etwas ist schiefgelaufen';
   @override String get retry => 'Erneut versuchen';
   @override String get settings => 'Einstellungen';
+  @override String get cleanappsPromoTitle => 'CleanApps ausprobieren';
+  @override String get cleanappsPromoSubtitle => 'Wische ungenutzte Apps weg und schaffe noch mehr Platz.';
+  @override String get cleanappsPromoCta => 'Installieren';
   @override String get statistics => 'Statistiken';
   @override String get language => 'Sprache';
   @override String get reminders => 'Erinnerungen';
@@ -255,6 +299,7 @@ class _GermanStrings extends AppStrings {
   @override String get monetization => 'Monetarisierung';
   @override String saveUpTo(String size) => 'Spare ~$size';
   @override String get removeAds => 'Werbung entfernen';
+  @override String get homeProCta => 'Werbung entfernen mit CleanPics Pro';
   @override String get proTitle => 'CleanPics Pro';
   @override String get proDesc => 'Entferne alle Werbung dauerhaft mit einem einmaligen Kauf.';
   @override String proButton(String price) => 'Werbung entfernen · $price';
@@ -288,10 +333,15 @@ class _FrenchStrings extends AppStrings {
   @override String get analyzingPhotos => 'Analyse en cours…';
   @override String get refresh => 'Actualiser';
   @override String get allClean => 'Tout est propre ! 🎉';
+  @override String get coachNext => 'Suivant';
+  @override String get coachDone => 'Compris';
   @override String get groupMode => 'Révision par groupe';
   @override String get groupModeDesc => 'Voir 4 photos similaires et appuyer pour supprimer.';
-  @override String get swipeMode => 'Mode swipe';
+  @override String get swipeMode => 'Balayer les photos';
   @override String get swipeModeDesc => 'Balayez à gauche pour supprimer, à droite pour garder.';
+  @override String get videoMode => 'Balayer les vidéos';
+  @override String get videoModeDesc => 'Balayez à gauche pour supprimer, à droite pour garder, maintenez pour prévisualiser.';
+  @override String get swipeAnyToContinue => 'Balayez dans un sens ou l\'autre pour continuer';
   @override String get totalPhotos => 'Total photos';
   @override String get similarGroups => 'Groupes similaires';
   @override String get librarySize => 'Taille de la bibliothèque';
@@ -313,13 +363,21 @@ class _FrenchStrings extends AppStrings {
   @override String get deleted_noun => 'supprimées';
   @override String get backHome => 'Retour';
   @override String get recoverHint => 'Les photos supprimées restent ~30 jours dans « Supprimées récemment ».';
+  @override String get sponsored => 'Sponsorisé';
+  @override String get adSwipeHint => 'Balayez dans un sens pour continuer';
   @override String deleted(int n, String size) => '$n photo${n == 1 ? '' : 's'} supprimée${n == 1 ? '' : 's'} · $size libéré !';
   @override String get permissionTitle => 'Accès aux photos requis';
   @override String get permissionBody => 'CleanPics a besoin d\'accéder à vos photos.';
   @override String get openSettings => 'Ouvrir les paramètres';
+  @override String get videoAccessTitle => 'Autoriser l\'accès aux vidéos';
+  @override String get videoAccessBody => 'Pour nettoyer les vidéos, CleanPics a besoin d\'accéder à toutes vos vidéos. Ouvrez les Paramètres et réglez « Photos et vidéos » sur Tout autoriser.';
+  @override String get notNow => 'Pas maintenant';
   @override String get errorMessage => 'Une erreur s\'est produite';
   @override String get retry => 'Réessayer';
   @override String get settings => 'Paramètres';
+  @override String get cleanappsPromoTitle => 'Essayez CleanApps';
+  @override String get cleanappsPromoSubtitle => 'Balayez pour désinstaller les apps inutilisées et libérez encore plus d\'espace.';
+  @override String get cleanappsPromoCta => 'Obtenir';
   @override String get statistics => 'Statistiques';
   @override String get language => 'Langue';
   @override String get reminders => 'Rappels';
@@ -330,6 +388,7 @@ class _FrenchStrings extends AppStrings {
   @override String get monetization => 'Monétisation';
   @override String saveUpTo(String size) => 'Gagnez ~$size';
   @override String get removeAds => 'Supprimer les pubs';
+  @override String get homeProCta => 'Supprimez les pubs avec CleanPics Pro';
   @override String get proTitle => 'CleanPics Pro';
   @override String get proDesc => 'Supprimez toutes les pubs pour toujours avec un achat unique.';
   @override String proButton(String price) => 'Supprimer les pubs · $price';
@@ -363,10 +422,15 @@ class _PortugueseStrings extends AppStrings {
   @override String get analyzingPhotos => 'Analisando fotos…';
   @override String get refresh => 'Atualizar';
   @override String get allClean => 'Tudo limpo! 🎉';
+  @override String get coachNext => 'Próximo';
+  @override String get coachDone => 'Entendi';
   @override String get groupMode => 'Revisão em grupo';
   @override String get groupModeDesc => 'Veja 4 fotos similares e toque para deletar.';
-  @override String get swipeMode => 'Modo swipe';
+  @override String get swipeMode => 'Deslizar fotos';
   @override String get swipeModeDesc => 'Deslize para esquerda para deletar, direita para manter.';
+  @override String get videoMode => 'Deslizar vídeos';
+  @override String get videoModeDesc => 'Deslize à esquerda para apagar, à direita para manter, segure para pré-visualizar.';
+  @override String get swipeAnyToContinue => 'Deslize para qualquer lado para continuar';
   @override String get totalPhotos => 'Total de fotos';
   @override String get similarGroups => 'Grupos similares';
   @override String get librarySize => 'Tamanho';
@@ -388,13 +452,21 @@ class _PortugueseStrings extends AppStrings {
   @override String get deleted_noun => 'deletadas';
   @override String get backHome => 'Voltar';
   @override String get recoverHint => 'Fotos apagadas ficam ~30 dias em "Apagadas recentemente" do telefone.';
+  @override String get sponsored => 'Patrocinado';
+  @override String get adSwipeHint => 'Deslize para qualquer lado para continuar';
   @override String deleted(int n, String size) => '$n foto${n == 1 ? '' : 's'} deletada${n == 1 ? '' : 's'} · $size liberado!';
   @override String get permissionTitle => 'Acesso às fotos necessário';
   @override String get permissionBody => 'CleanPics precisa de acesso às suas fotos.';
   @override String get openSettings => 'Abrir configurações';
+  @override String get videoAccessTitle => 'Permitir acesso a vídeos';
+  @override String get videoAccessBody => 'Para limpar vídeos, o CleanPics precisa de acesso a todos os seus vídeos. Abra as Configurações e defina "Fotos e vídeos" como Permitir tudo.';
+  @override String get notNow => 'Agora não';
   @override String get errorMessage => 'Algo deu errado';
   @override String get retry => 'Tentar novamente';
   @override String get settings => 'Configurações';
+  @override String get cleanappsPromoTitle => 'Experimente CleanApps';
+  @override String get cleanappsPromoSubtitle => 'Deslize para desinstalar apps que não usa e libere ainda mais espaço.';
+  @override String get cleanappsPromoCta => 'Obter';
   @override String get statistics => 'Estatísticas';
   @override String get language => 'Idioma';
   @override String get reminders => 'Lembretes';
@@ -405,6 +477,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get monetization => 'Monetização';
   @override String saveUpTo(String size) => 'Economize ~$size';
   @override String get removeAds => 'Remover anúncios';
+  @override String get homeProCta => 'Remova os anúncios com CleanPics Pro';
   @override String get proTitle => 'CleanPics Pro';
   @override String get proDesc => 'Remova todos os anúncios para sempre com uma compra única.';
   @override String proButton(String price) => 'Remover anúncios · $price';
@@ -438,10 +511,15 @@ class _ItalianStrings extends AppStrings {
   @override String get analyzingPhotos => 'Analisi in corso…';
   @override String get refresh => 'Aggiorna';
   @override String get allClean => 'Tutto pulito! 🎉';
+  @override String get coachNext => 'Avanti';
+  @override String get coachDone => 'Capito';
   @override String get groupMode => 'Revisione per gruppo';
   @override String get groupModeDesc => 'Vedi 4 foto simili e tocca per eliminare.';
-  @override String get swipeMode => 'Modalità swipe';
+  @override String get swipeMode => 'Scorri foto';
   @override String get swipeModeDesc => 'Scorri a sinistra per eliminare, a destra per tenere.';
+  @override String get videoMode => 'Scorri video';
+  @override String get videoModeDesc => 'Scorri a sinistra per eliminare, a destra per tenere, tieni premuto per vedere.';
+  @override String get swipeAnyToContinue => 'Scorri in una direzione per continuare';
   @override String get totalPhotos => 'Foto totali';
   @override String get similarGroups => 'Gruppi simili';
   @override String get librarySize => 'Dimensione libreria';
@@ -463,13 +541,21 @@ class _ItalianStrings extends AppStrings {
   @override String get deleted_noun => 'eliminate';
   @override String get backHome => 'Torna alla home';
   @override String get recoverHint => 'Le foto eliminate restano ~30 giorni in "Eliminate di recente".';
+  @override String get sponsored => 'Sponsorizzato';
+  @override String get adSwipeHint => 'Scorri in una direzione per continuare';
   @override String deleted(int n, String size) => '$n foto eliminate · $size liberato!';
   @override String get permissionTitle => 'Accesso alle foto richiesto';
   @override String get permissionBody => 'CleanPics ha bisogno di accedere alle tue foto.';
   @override String get openSettings => 'Apri impostazioni';
+  @override String get videoAccessTitle => 'Consenti accesso ai video';
+  @override String get videoAccessBody => 'Per pulire i video, CleanPics ha bisogno di accedere a tutti i tuoi video. Apri le Impostazioni e imposta "Foto e video" su Consenti tutto.';
+  @override String get notNow => 'Non ora';
   @override String get errorMessage => 'Qualcosa è andato storto';
   @override String get retry => 'Riprova';
   @override String get settings => 'Impostazioni';
+  @override String get cleanappsPromoTitle => 'Prova CleanApps';
+  @override String get cleanappsPromoSubtitle => 'Scorri per disinstallare le app inutilizzate e libera ancora più spazio.';
+  @override String get cleanappsPromoCta => 'Scarica';
   @override String get statistics => 'Statistiche';
   @override String get language => 'Lingua';
   @override String get reminders => 'Promemoria';
@@ -480,6 +566,7 @@ class _ItalianStrings extends AppStrings {
   @override String get monetization => 'Monetizzazione';
   @override String saveUpTo(String size) => 'Risparmia ~$size';
   @override String get removeAds => 'Rimuovi pubblicità';
+  @override String get homeProCta => 'Rimuovi la pubblicità con CleanPics Pro';
   @override String get proTitle => 'CleanPics Pro';
   @override String get proDesc => 'Rimuovi tutta la pubblicità per sempre con un acquisto unico.';
   @override String proButton(String price) => 'Rimuovi pubblicità · $price';

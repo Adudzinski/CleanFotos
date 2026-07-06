@@ -39,14 +39,18 @@ class AdService {
   // Leave a value empty until that unit is created → it falls back to a test ID.
   static const _androidBannerProd = 'ca-app-pub-6352577985769083/7886470703';
   static const _androidInterstitialProd = 'ca-app-pub-6352577985769083/8312856434';
+  static const _androidNativeProd = 'ca-app-pub-6352577985769083/9710342782';
   static const _iosBannerProd = ''; // TODO: create iOS app + units
   static const _iosInterstitialProd = '';
+  static const _iosNativeProd = '';
 
   // ── Google test unit IDs (used in debug builds, or until prod IDs exist) ────
   static const _androidBannerTest = 'ca-app-pub-3940256099942544/6300978111';
   static const _iosBannerTest = 'ca-app-pub-3940256099942544/2934735716';
   static const _androidInterstitialTest = 'ca-app-pub-3940256099942544/1033173712';
   static const _iosInterstitialTest = 'ca-app-pub-3940256099942544/4411468910';
+  static const _androidNativeTest = 'ca-app-pub-3940256099942544/2247696110';
+  static const _iosNativeTest = 'ca-app-pub-3940256099942544/3986624511';
 
   /// Returns the prod ID in release builds (if set), otherwise the test ID.
   /// Debug builds always use test ads to protect the account from self-clicks.
@@ -60,6 +64,10 @@ class AdService {
   static String get interstitialUnitId => Platform.isIOS
       ? _pick(_iosInterstitialProd, _iosInterstitialTest)
       : _pick(_androidInterstitialProd, _androidInterstitialTest);
+
+  static String get nativeUnitId => Platform.isIOS
+      ? _pick(_iosNativeProd, _iosNativeTest)
+      : _pick(_androidNativeProd, _androidNativeTest);
 
   /// Gather consent (UMP), initialize the SDK, and pre-load an interstitial.
   /// Idempotent — safe to call more than once (runs at most once).

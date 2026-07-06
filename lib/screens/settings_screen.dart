@@ -5,6 +5,7 @@ import '../providers/app_provider.dart';
 import '../services/ad_service.dart';
 import '../services/purchase_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/cleanapps_promo_banner.dart';
 import '../l10n/strings.dart';
 
 const String kPrivacyPolicyUrl =
@@ -23,6 +24,11 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          // ── CleanApps cross-promo ─────────────────────────────────────────
+          CleanAppsPromoBanner(s: s),
+
+          const SizedBox(height: 24),
+
           // ── Stats Card ────────────────────────────────────────────────────
           _sectionHeader(s.statistics),
           _statsCard(context, provider, s),
@@ -35,15 +41,9 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // ── Monetization / Ads ───────────────────────────────────────────
-          _sectionHeader(s.monetization),
+          // ── Remove Ads ────────────────────────────────────────────────────
+          _sectionHeader(s.removeAds),
           _proCard(context, provider, s),
-
-          const SizedBox(height: 24),
-
-          // ── Reminders ─────────────────────────────────────────────────────
-          _sectionHeader(s.reminders),
-          _reminderCard(context, provider, s),
 
           const SizedBox(height: 24),
 
@@ -247,38 +247,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _reminderCard(
-      BuildContext context, AppProvider provider, AppStrings s) {
-    return _card(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(s.monthlyReminder,
-                    style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(s.monthlyReminderDesc,
-                    style: const TextStyle(
-                        fontSize: 16,
-                        color: AppTheme.textSecondary,
-                        height: 1.4)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Switch(
-            value: provider.remindersEnabled,
-            onChanged: provider.setReminders,
-            activeColor: AppTheme.primary,
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _aboutCard(
       BuildContext context, AppProvider provider, AppStrings s) {
     // The "Ad privacy options" entry is only meaningful for non-Pro users in
@@ -289,8 +257,6 @@ class SettingsScreen extends StatelessWidget {
     return _card(
       child: Column(
         children: [
-          _infoRow(s.appVersion, '1.0.0'),
-          _divider(),
           InkWell(
             onTap: _openPrivacyPolicy,
             child: Padding(

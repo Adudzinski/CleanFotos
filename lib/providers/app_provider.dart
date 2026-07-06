@@ -34,7 +34,7 @@ class AppProvider extends ChangeNotifier {
   int deletedCount = 0;
   String languageCode = 'en';
   bool isPro = false;
-  bool remindersEnabled = true;
+  bool onboardingSeen = false;
 
   /// Ads show unless the user has unlocked Pro.
   bool get adsEnabled => !isPro;
@@ -48,7 +48,7 @@ class AppProvider extends ChangeNotifier {
     // Default to the phone's language on first launch, else the saved choice.
     languageCode = prefs.getString('language_code') ?? _deviceLanguage();
     isPro = prefs.getBool('is_pro') ?? false;
-    remindersEnabled = prefs.getBool('reminders_enabled') ?? true;
+    onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
     notifyListeners();
 
     // Only gather ad consent / initialize ads for non-Pro users. Pro users get
@@ -60,7 +60,7 @@ class AppProvider extends ChangeNotifier {
     // Set up in-app purchases; unlock Pro when a purchase/restore completes.
     PurchaseService.instance.init(onPurchased: () => setPro(true));
 
-    // Schedule (or clear) the monthly cleanup reminder.
+    // Schedule the seasonal cleanup reminders (always on).
     _setupReminders();
   }
 
@@ -71,24 +71,20 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> _setupReminders() async {
-    if (!remindersEnabled) {
-      await NotificationService.instance.cancelMonthlyReminder();
-      return;
-    }
     await NotificationService.instance.requestPermissions();
     final s = AppStrings.of(languageCode);
-    await NotificationService.instance.scheduleMonthlyReminder(
+    await NotificationService.instance.scheduleReminders(
       title: s.reminderTitle,
       body: s.reminderBody,
     );
   }
 
-  Future<void> setReminders(bool value) async {
-    remindersEnabled = value;
+  Future<void> markOnboardingSeen() async {
+    if (onboardingSeen) return;
+    onboardingSeen = true;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reminders_enabled', value);
+    await prefs.setBool('onboarding_seen', true);
     notifyListeners();
-    await _setupReminders();
   }
 
   Future<void> setPro(bool value) async {

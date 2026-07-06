@@ -12,11 +12,17 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  static const int _monthlyId = 1001;
-
-  // Reminder fires on this day-of-month at this hour (local time).
-  static const int _reminderDayOfMonth = 1;
+  static const int _baseId = 1001;
   static const int _reminderHour = 10;
+
+  // Reminders fire around two periods a year: just before/after New Year, and
+  // mid-year. [month, day] pairs, each recurs annually.
+  static const List<List<int>> _reminderDates = [
+    [12, 28], // before New Year
+    [1, 2], // just after New Year
+    [6, 28], // mid-year
+    [7, 1], // mid-year
+  ];
 
   bool _ready = false;
 
@@ -62,47 +68,47 @@ class NotificationService {
     return granted;
   }
 
-  /// Schedule a repeating monthly reminder. Re-scheduling with the same id
-  /// replaces the previous one (e.g. after a language change).
-  Future<void> scheduleMonthlyReminder({
+  /// Schedule the twice-a-year cleanup reminders. Re-scheduling replaces any
+  /// previous ones (e.g. after a language change).
+  Future<void> scheduleReminders({
     required String title,
     required String body,
   }) async {
     if (!_ready) return;
-    await _plugin.zonedSchedule(
-      _monthlyId,
-      title,
-      body,
-      _nextReminderDate(),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'cleanup_reminders',
-          'Cleanup reminders',
-          channelDescription: 'Monthly reminder to clean up your photos',
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
+    for (int i = 0; i < _reminderDates.length; i++) {
+      final d = _reminderDates[i];
+      await _plugin.zonedSchedule(
+        _baseId + i,
+        title,
+        body,
+        _nextDate(d[0], d[1]),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'cleanup_reminders',
+            'Cleanup reminders',
+            channelDescription: 'Seasonal reminder to clean up your photos',
+            importance: Importance.defaultImportance,
+            priority: Priority.defaultPriority,
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
-    );
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        // Recur every year on this month/day/time.
+        matchDateTimeComponents: DateTimeComponents.dateAndTime,
+      );
+    }
   }
 
-  Future<void> cancelMonthlyReminder() => _plugin.cancel(_monthlyId);
-
-  /// Next occurrence of [_reminderDayOfMonth] at [_reminderHour], in the future.
-  tz.TZDateTime _nextReminderDate() {
+  /// Next occurrence of [month]/[day] at [_reminderHour], in the future.
+  tz.TZDateTime _nextDate(int month, int day) {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(
-        tz.local, now.year, now.month, _reminderDayOfMonth, _reminderHour);
+    var scheduled =
+        tz.TZDateTime(tz.local, now.year, month, day, _reminderHour);
     if (!scheduled.isAfter(now)) {
-      final nextMonth = now.month == 12 ? 1 : now.month + 1;
-      final year = now.month == 12 ? now.year + 1 : now.year;
-      scheduled = tz.TZDateTime(
-          tz.local, year, nextMonth, _reminderDayOfMonth, _reminderHour);
+      scheduled =
+          tz.TZDateTime(tz.local, now.year + 1, month, day, _reminderHour);
     }
     return scheduled;
   }

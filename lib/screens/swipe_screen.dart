@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import '../models/photo_group.dart';
 import '../providers/app_provider.dart';
+import '../services/ad_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/celebration_overlay.dart';
 import '../l10n/strings.dart';
@@ -34,6 +36,14 @@ class _SwipeScreenState extends State<SwipeScreen>
   late Animation<double> _flyRotation;
   bool _flyingLeft = false;
 
+  // When the back card becomes front, scale it up smoothly instead of jumping
+  // wider (back and front must share the same outer padding).
+  late AnimationController _promote;
+  late Animation<double> _promoteScale;
+  static const EdgeInsets _cardPadding =
+      EdgeInsets.symmetric(horizontal: 16, vertical: 20);
+  static const double _backCardScale = 0.94;
+
   int _deletedCount = 0;
   int _freedBytes = 0;
 
@@ -41,6 +51,16 @@ class _SwipeScreenState extends State<SwipeScreen>
   // system permission dialog) when the user finishes or leaves.
   final List<AssetEntity> _pendingDelete = [];
   late final AppProvider _provider;
+
+  // ── In-deck native ad ──────────────────────────────────────────────────────
+  // Every [_adInterval] swipes, an ad card is slipped into the deck. Swiping it
+  // (either direction) just dismisses it — nothing is deleted and it doesn't
+  // count toward the photo queue.
+  static const int _adInterval = 12;
+  NativeAd? _nativeAd;
+  bool _nativeAdLoaded = false;
+  bool _showingAd = false;
+  int _swipesSinceAd = 0;
 
   @override
   void initState() {
@@ -62,14 +82,112 @@ class _SwipeScreenState extends State<SwipeScreen>
     _flyRotation = Tween<double>(begin: 0, end: 0.4).animate(
       CurvedAnimation(parent: _flyOut, curve: Curves.easeIn),
     );
+    _promote = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _promoteScale = Tween<double>(begin: _backCardScale, end: 1.0).animate(
+      CurvedAnimation(parent: _promote, curve: Curves.easeOut),
+    );
+    _promote.value = 1.0; // first card starts at full size
+
+    if (_provider.adsEnabled) _loadNativeAd();
   }
+
+  void _playPromoteAnimation() => _promote.forward(from: 0);
 
   @override
   void dispose() {
     // Flush any queued deletions if the user leaves before finishing.
     _commitDeletions();
     _flyOut.dispose();
+    _promote.dispose();
+    _nativeAd?.dispose();
     super.dispose();
+  }
+
+  /// Pre-load a native ad so a filled ad card is ready when its slot comes up.
+  void _loadNativeAd() {
+    if (!AdService.instance.canRequestAds) return;
+    final ad = NativeAd(
+      adUnitId: AdService.nativeUnitId,
+      request: const AdRequest(),
+      nativeTemplateStyle: NativeTemplateStyle(
+        templateType: TemplateType.medium,
+        mainBackgroundColor: const Color(0xFF15151C),
+        callToActionTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white,
+          backgroundColor: AppTheme.primary,
+          style: NativeTemplateFontStyle.bold,
+          size: 16,
+        ),
+        primaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white,
+          style: NativeTemplateFontStyle.bold,
+          size: 17,
+        ),
+        secondaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white70,
+          size: 15,
+        ),
+        tertiaryTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white54,
+          size: 14,
+        ),
+      ),
+      listener: NativeAdListener(
+        onAdLoaded: (_) {
+          if (mounted) setState(() => _nativeAdLoaded = true);
+        },
+        onAdFailedToLoad: (ad, _) {
+          ad.dispose();
+          _nativeAd = null;
+          _nativeAdLoaded = false;
+        },
+      ),
+    );
+    _nativeAd = ad;
+    ad.load();
+  }
+
+  /// Called after every photo swipe: slip the ad card in when it's due & ready.
+  void _maybeShowAd() {
+    if (_done || _showingAd) return;
+    if (_swipesSinceAd >= _adInterval && _nativeAdLoaded) {
+      setState(() {
+        _showingAd = true;
+        _swipesSinceAd = 0;
+      });
+    }
+  }
+
+  /// Fly the ad card off-screen, then resume the photo deck and pre-load the
+  /// next ad.
+  Future<void> _dismissAd({required bool toLeft}) async {
+    _flyOffset = Tween<Offset>(
+      begin: Offset(_dragX / 300, _dragY / 300),
+      end: Offset(toLeft ? -3 : 3, -0.3),
+    ).animate(CurvedAnimation(parent: _flyOut, curve: Curves.easeIn));
+    _flyRotation =
+        Tween<double>(begin: _dragX / 1000, end: toLeft ? -0.5 : 0.5).animate(
+      CurvedAnimation(parent: _flyOut, curve: Curves.easeIn),
+    );
+    await _flyOut.forward(from: 0);
+    _flyOut.reset();
+
+    _nativeAd?.dispose();
+    _nativeAd = null;
+    _nativeAdLoaded = false;
+
+    setState(() {
+      _showingAd = false;
+      _dragX = 0;
+      _dragY = 0;
+      _isDragging = false;
+    });
+
+    _playPromoteAnimation();
+    _loadNativeAd();
   }
 
   /// Delete all queued photos in one batch (one permission dialog).
@@ -111,6 +229,10 @@ class _SwipeScreenState extends State<SwipeScreen>
       _isDragging = false;
     });
 
+    _swipesSinceAd++;
+    _maybeShowAd();
+    if (!_showingAd) _playPromoteAnimation();
+
     if (_current >= _queue.length) await _commitDeletions();
   }
 
@@ -134,6 +256,10 @@ class _SwipeScreenState extends State<SwipeScreen>
       _isDragging = false;
     });
 
+    _swipesSinceAd++;
+    _maybeShowAd();
+    if (!_showingAd) _playPromoteAnimation();
+
     if (_current >= _queue.length) await _commitDeletions();
   }
 
@@ -147,6 +273,19 @@ class _SwipeScreenState extends State<SwipeScreen>
 
   void _onDragEnd(DragEndDetails d) {
     const threshold = 100.0;
+    if (_showingAd) {
+      // Ad card: either direction just dismisses it (nothing is deleted).
+      if (_dragX.abs() > threshold) {
+        _dismissAd(toLeft: _dragX < 0);
+      } else {
+        setState(() {
+          _dragX = 0;
+          _dragY = 0;
+          _isDragging = false;
+        });
+      }
+      return;
+    }
     if (_dragX < -threshold) {
       _swipeLeft();
     } else if (_dragX > threshold) {
@@ -195,10 +334,10 @@ class _SwipeScreenState extends State<SwipeScreen>
   }
 
   Widget _buildSwipeArea(BuildContext context, AppStrings s) {
-    final size = MediaQuery.of(context).size;
+    final showAd = _showingAd && _nativeAd != null;
     final asset = _queue[_current];
 
-    // Determine overlay opacity based on drag
+    // Determine overlay opacity based on drag (photo cards only)
     final deleteOpacity = (_dragX < 0 ? (-_dragX / 120).clamp(0.0, 1.0) : 0.0);
     final keepOpacity = (_dragX > 0 ? (_dragX / 120).clamp(0.0, 1.0) : 0.0);
 
@@ -212,19 +351,24 @@ class _SwipeScreenState extends State<SwipeScreen>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Next card (peek behind)
-                if (_current + 1 < _queue.length)
+                // Next card (peek behind). Same padding as the front card so
+                // promoting it never jumps wider; scale gives the depth effect.
+                if (showAd || _current + 1 < _queue.length)
                   Positioned.fill(
                     child: Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                      child: _buildCard(_queue[_current + 1], 0, 0, 0),
+                      padding: _cardPadding,
+                      child: Transform.scale(
+                        scale: _backCardScale,
+                        child: showAd
+                            ? _buildCard(asset, 0, 0, 0)
+                            : _buildCard(_queue[_current + 1], 0, 0, 0),
+                      ),
                     ),
                   ),
 
                 // Current card
                 AnimatedBuilder(
-                  animation: _flyOut,
+                  animation: Listenable.merge([_flyOut, _promote]),
                   builder: (context, _) {
                     final extraX =
                         _flyOut.isAnimating ? _flyOffset.value.dx * 300 : 0.0;
@@ -240,10 +384,14 @@ class _SwipeScreenState extends State<SwipeScreen>
                         ..translate(_dragX + extraX, _dragY + extraY)
                         ..rotateZ(rot),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 20),
-                        child: _buildCard(asset, deleteOpacity, keepOpacity,
-                            _dragX / 1000),
+                        padding: _cardPadding,
+                        child: ScaleTransition(
+                          scale: _promoteScale,
+                          child: showAd
+                              ? _buildAdCard(s)
+                              : _buildCard(asset, deleteOpacity, keepOpacity,
+                                  _dragX / 1000),
+                        ),
                       ),
                     );
                   },
@@ -256,6 +404,61 @@ class _SwipeScreenState extends State<SwipeScreen>
         // Bottom buttons & instructions
         _buildBottomBar(context, s),
       ],
+    );
+  }
+
+  /// The native ad rendered as a swipe card, clearly marked as sponsored.
+  Widget _buildAdCard(AppStrings s) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF15151C),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white12),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  s.sponsored,
+                  style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 280,
+                  minHeight: 320,
+                  maxHeight: 400,
+                ),
+                child: AdWidget(ad: _nativeAd!),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            s.adSwipeHint,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white54, fontSize: 15),
+          ),
+        ],
+      ),
     );
   }
 
@@ -389,7 +592,8 @@ class _SwipeScreenState extends State<SwipeScreen>
                 icon: Icons.delete_outline,
                 label: s.swipeDelete,
                 color: AppTheme.danger,
-                onTap: _swipeLeft,
+                onTap: () =>
+                    _showingAd ? _dismissAd(toLeft: true) : _swipeLeft(),
               ),
               // Counter
               Column(
@@ -410,7 +614,8 @@ class _SwipeScreenState extends State<SwipeScreen>
                 icon: Icons.check_circle_outline,
                 label: s.swipeKeep,
                 color: AppTheme.success,
-                onTap: _swipeRight,
+                onTap: () =>
+                    _showingAd ? _dismissAd(toLeft: false) : _swipeRight(),
               ),
             ],
           ),
