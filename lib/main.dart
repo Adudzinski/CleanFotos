@@ -32,6 +32,9 @@ void main() async {
 
   // Initialize photo manager log level
   PhotoManager.setLog(false);
+  // Make sure we never bypass the permission flow — doing so breaks photo
+  // listing and deletion on Android.
+  await PhotoManager.setIgnorePermissionCheck(false);
 
   runApp(const CleanPicsApp());
 }

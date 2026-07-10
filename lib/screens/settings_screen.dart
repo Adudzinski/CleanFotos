@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../services/ad_service.dart';
 import '../services/purchase_service.dart';
+import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/cleanapps_promo_banner.dart';
 import '../l10n/strings.dart';
@@ -257,6 +258,23 @@ class SettingsScreen extends StatelessWidget {
     return _card(
       child: Column(
         children: [
+          InkWell(
+            onTap: () => ReviewService.instance.openStoreListing(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Text(s.rateApp,
+                      style: const TextStyle(
+                          fontSize: 17, color: AppTheme.textSecondary)),
+                  const Spacer(),
+                  const Icon(Icons.star_rounded,
+                      size: 22, color: AppTheme.primary),
+                ],
+              ),
+            ),
+          ),
+          _divider(),
           InkWell(
             onTap: _openPrivacyPolicy,
             child: Padding(

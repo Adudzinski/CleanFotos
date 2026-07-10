@@ -36,7 +36,7 @@ class AppStrings {
   String get coachDone => 'Got it';
   String get groupMode => 'Group Review';
   String get groupModeDesc =>
-      'See 4 similar photos at once and tap to delete.';
+      'Review photos taken within 3 minutes of each other. Single photos are in Picture Swipe.';
   String get swipeMode => 'Picture Swipe';
   String get swipeModeDesc =>
       'Swipe left to delete, right to keep.';
@@ -87,10 +87,15 @@ class AppStrings {
   String get videoAccessTitle => 'Allow video access';
   String get videoAccessBody =>
       'To clean up videos, CleanPics needs access to all your videos. Open Settings and set "Photos and videos" to Allow all.';
+  String get limitedAccessTitle => 'Not all photos visible';
+  String get limitedAccessBody =>
+      'CleanPics can only see the photos you selected. Open Settings and set "Photos and videos" to Allow all.';
   String get notNow => 'Not now';
 
   // ── Error ─────────────────────────────────────────────────────────────────
   String get errorMessage => 'Something went wrong';
+  String get deleteFailed =>
+      'Photos were not deleted. Check that CleanPics has full photo access in Settings.';
   String get retry => 'Try Again';
 
   // ── Settings ──────────────────────────────────────────────────────────────
@@ -131,6 +136,7 @@ class AppStrings {
       'App Store Optimization + positive ratings drive organic installs.';
   String get about => 'About';
   String get privacyPolicy => 'Privacy Policy';
+  String get rateApp => 'Rate CleanPics';
   String get privacyOptions => 'Ad privacy options';
   String get appVersion => 'Version';
   String get buildWith => 'Built with';
@@ -193,6 +199,8 @@ class _SpanishStrings extends AppStrings {
   @override String get openSettings => 'Abrir ajustes';
   @override String get videoAccessTitle => 'Permitir acceso a videos';
   @override String get videoAccessBody => 'Para limpiar videos, CleanPics necesita acceso a todos tus videos. Abre Ajustes y pon "Fotos y videos" en Permitir todo.';
+  @override String get limitedAccessTitle => 'No se ven todas las fotos';
+  @override String get limitedAccessBody => 'CleanPics solo puede ver las fotos que seleccionaste. Abre Ajustes y pon "Fotos y videos" en Permitir todo.';
   @override String get notNow => 'Ahora no';
   @override String get errorMessage => 'Algo salió mal';
   @override String get retry => 'Reintentar';
@@ -226,6 +234,7 @@ class _SpanishStrings extends AppStrings {
   @override String get tip4 => 'ASO + valoraciones positivas = más descargas.';
   @override String get about => 'Acerca de';
   @override String get privacyPolicy => 'Política de privacidad';
+  @override String get rateApp => 'Valorar CleanPics';
   @override String get privacyOptions => 'Opciones de privacidad de anuncios';
   @override String get appVersion => 'Versión';
   @override String get buildWith => 'Creado con';
@@ -282,6 +291,8 @@ class _GermanStrings extends AppStrings {
   @override String get openSettings => 'Einstellungen öffnen';
   @override String get videoAccessTitle => 'Videozugriff erlauben';
   @override String get videoAccessBody => 'Um Videos aufzuräumen, benötigt CleanPics Zugriff auf alle deine Videos. Öffne die Einstellungen und stelle „Fotos und Videos" auf Alle zulassen.';
+  @override String get limitedAccessTitle => 'Nicht alle Fotos sichtbar';
+  @override String get limitedAccessBody => 'CleanPics sieht nur die von dir ausgewählten Fotos. Öffne die Einstellungen und stelle „Fotos und Videos" auf Alle zulassen.';
   @override String get notNow => 'Nicht jetzt';
   @override String get errorMessage => 'Etwas ist schiefgelaufen';
   @override String get retry => 'Erneut versuchen';
@@ -315,6 +326,7 @@ class _GermanStrings extends AppStrings {
   @override String get tip4 => 'ASO + gute Bewertungen = mehr Downloads.';
   @override String get about => 'Über';
   @override String get privacyPolicy => 'Datenschutz';
+  @override String get rateApp => 'CleanPics bewerten';
   @override String get privacyOptions => 'Datenschutzoptionen für Werbung';
   @override String get appVersion => 'Version';
   @override String get buildWith => 'Erstellt mit';
@@ -371,6 +383,8 @@ class _FrenchStrings extends AppStrings {
   @override String get openSettings => 'Ouvrir les paramètres';
   @override String get videoAccessTitle => 'Autoriser l\'accès aux vidéos';
   @override String get videoAccessBody => 'Pour nettoyer les vidéos, CleanPics a besoin d\'accéder à toutes vos vidéos. Ouvrez les Paramètres et réglez « Photos et vidéos » sur Tout autoriser.';
+  @override String get limitedAccessTitle => 'Toutes les photos ne sont pas visibles';
+  @override String get limitedAccessBody => 'CleanPics ne voit que les photos que vous avez sélectionnées. Ouvrez les Paramètres et réglez « Photos et vidéos » sur Tout autoriser.';
   @override String get notNow => 'Pas maintenant';
   @override String get errorMessage => 'Une erreur s\'est produite';
   @override String get retry => 'Réessayer';
@@ -404,6 +418,7 @@ class _FrenchStrings extends AppStrings {
   @override String get tip4 => 'ASO + avis positifs = plus de téléchargements.';
   @override String get about => 'À propos';
   @override String get privacyPolicy => 'Politique de confidentialité';
+  @override String get rateApp => 'Noter CleanPics';
   @override String get privacyOptions => 'Options de confidentialité des annonces';
   @override String get appVersion => 'Version';
   @override String get buildWith => 'Créé avec';
@@ -460,6 +475,8 @@ class _PortugueseStrings extends AppStrings {
   @override String get openSettings => 'Abrir configurações';
   @override String get videoAccessTitle => 'Permitir acesso a vídeos';
   @override String get videoAccessBody => 'Para limpar vídeos, o CleanPics precisa de acesso a todos os seus vídeos. Abra as Configurações e defina "Fotos e vídeos" como Permitir tudo.';
+  @override String get limitedAccessTitle => 'Nem todas as fotos estão visíveis';
+  @override String get limitedAccessBody => 'O CleanPics só vê as fotos que você selecionou. Abra as Configurações e defina "Fotos e vídeos" como Permitir tudo.';
   @override String get notNow => 'Agora não';
   @override String get errorMessage => 'Algo deu errado';
   @override String get retry => 'Tentar novamente';
@@ -493,6 +510,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get tip4 => 'ASO + avaliações positivas = mais downloads.';
   @override String get about => 'Sobre';
   @override String get privacyPolicy => 'Política de privacidade';
+  @override String get rateApp => 'Avaliar o CleanPics';
   @override String get privacyOptions => 'Opções de privacidade de anúncios';
   @override String get appVersion => 'Versão';
   @override String get buildWith => 'Criado com';
@@ -549,6 +567,8 @@ class _ItalianStrings extends AppStrings {
   @override String get openSettings => 'Apri impostazioni';
   @override String get videoAccessTitle => 'Consenti accesso ai video';
   @override String get videoAccessBody => 'Per pulire i video, CleanPics ha bisogno di accedere a tutti i tuoi video. Apri le Impostazioni e imposta "Foto e video" su Consenti tutto.';
+  @override String get limitedAccessTitle => 'Non tutte le foto sono visibili';
+  @override String get limitedAccessBody => 'CleanPics vede solo le foto che hai selezionato. Apri le Impostazioni e imposta "Foto e video" su Consenti tutto.';
   @override String get notNow => 'Non ora';
   @override String get errorMessage => 'Qualcosa è andato storto';
   @override String get retry => 'Riprova';
@@ -582,6 +602,7 @@ class _ItalianStrings extends AppStrings {
   @override String get tip4 => 'ASO + recensioni positive = più download.';
   @override String get about => 'Informazioni';
   @override String get privacyPolicy => 'Informativa sulla privacy';
+  @override String get rateApp => 'Valuta CleanPics';
   @override String get privacyOptions => 'Opzioni privacy degli annunci';
   @override String get appVersion => 'Versione';
   @override String get buildWith => 'Creato con';

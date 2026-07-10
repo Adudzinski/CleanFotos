@@ -47,6 +47,8 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
   final List<AssetEntity> _pendingDelete = [];
   int _deletedCount = 0;
   int _freedBytes = 0;
+  bool _isCommitting = false;
+  bool _deletionsCommitted = false;
 
   VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
@@ -71,12 +73,19 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
         since = 0;
       }
     }
+    _restoreThenPrepare();
+  }
+
+  Future<void> _restoreThenPrepare() async {
     _prepareCurrent();
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _commitDeletions();
+    if (!_deletionsCommitted && _pendingDelete.isNotEmpty) {
+      _commitDeletions();
+    }
     _videoCtrl?.dispose();
     _nativeAd?.dispose();
     super.dispose();
@@ -140,11 +149,43 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
     ad.load();
   }
 
-  Future<void> _commitDeletions() async {
-    if (_pendingDelete.isEmpty) return;
+  Future<bool> _commitDeletions() async {
+    if (_pendingDelete.isEmpty) {
+      _deletionsCommitted = true;
+      return true;
+    }
+    if (_isCommitting) return false;
+    _isCommitting = true;
+
     final batch = List<AssetEntity>.from(_pendingDelete);
+    final batchCount = batch.length;
+    final batchBytes = batchCount * kAvgVideoBytes;
     _pendingDelete.clear();
-    await _provider.deleteAssets(batch);
+
+    final freed = await _provider.deleteAssets(batch);
+    _isCommitting = false;
+
+    if (freed == 0) {
+      _pendingDelete.addAll(batch);
+      _deletedCount = (_deletedCount - batchCount).clamp(0, _deletedCount);
+      _freedBytes = (_freedBytes - batchBytes).clamp(0, _freedBytes);
+      if (mounted) {
+        final s = AppStrings.of(_provider.languageCode);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.deleteFailed)),
+        );
+      }
+      return false;
+    }
+
+    _deletionsCommitted = true;
+    return true;
+  }
+
+  Future<void> _exitVideoSwipe() async {
+    if (_isCommitting) return;
+    final ok = await _commitDeletions();
+    if (mounted && ok) Navigator.of(context).pop();
   }
 
   void _advance() {
@@ -189,15 +230,24 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
     final provider = context.watch<AppProvider>();
     final s = AppStrings.of(provider.languageCode);
 
-    return CelebrationOverlay(
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _exitVideoSwipe();
+      },
+      child: CelebrationOverlay(
+        child: Scaffold(
           backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          title: Text(s.videoMode,
-              style: const TextStyle(color: Colors.white)),
-          actions: [
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text(s.videoMode,
+                style: const TextStyle(color: Colors.white)),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _exitVideoSwipe,
+            ),
+            actions: [
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Center(
@@ -214,6 +264,7 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
         ),
         body: _done ? _buildDone(context, s) : _buildDeck(context, s),
       ),
+    ),
     );
   }
 
@@ -520,7 +571,7 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
             ),
             const SizedBox(height: 40),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: _exitVideoSwipe,
               style: ElevatedButton.styleFrom(backgroundColor: kVideoAccent),
               child: Text(s.backHome),
             ),

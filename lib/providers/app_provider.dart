@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -8,6 +9,7 @@ import '../services/ad_service.dart';
 import '../services/notification_service.dart';
 import '../services/photo_service.dart';
 import '../services/purchase_service.dart';
+import '../utils/asset_utils.dart';
 
 const Set<String> kSupportedLanguages = {'en', 'es', 'de', 'fr', 'pt', 'it'};
 
@@ -26,6 +28,16 @@ class AppProvider extends ChangeNotifier {
 
   /// True while photos are being loaded + grouped for a cleanup mode.
   bool isLoadingGroups = false;
+
+  /// True when the OS granted only partial access ("Selected photos" on
+  /// Android 14+ / iOS limited library). The app then only sees a subset of
+  /// the library — surfaced on the home screen so the user can fix it.
+  bool limitedAccess = false;
+
+  /// All photos, newest-first — used by Picture Swipe (every photo, not just
+  /// duplicates). Loaded lazily and cached; cleared on Refresh.
+  List<AssetEntity> allPhotos = [];
+  bool photosLoaded = false;
 
   int _totalPhotos = 0;
 
@@ -87,6 +99,44 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ─── Resume cursors ─────────────────────────────────────────────────────
+  // Each swipe/review mode remembers the timestamp of the card the user was on,
+  // so it resumes there next time. Refresh clears them → start at the newest.
+  static const String kPhotoCursor = 'cursor_photo';
+  static const String kVideoCursor = 'cursor_video';
+  static const String kGroupCursor = 'cursor_group';
+
+  Future<int?> getCursor(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(key);
+  }
+
+  Future<void> setCursor(String key, int millis) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(key, millis);
+  }
+
+  /// Resume position for swipe/review modes — stores an asset or group id.
+  Future<String?> getCursorId(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('${key}_id');
+  }
+
+  Future<void> setCursorId(String key, String id) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('${key}_id', id);
+  }
+
+  Future<void> clearCursors() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(kPhotoCursor);
+    await prefs.remove(kVideoCursor);
+    await prefs.remove(kGroupCursor);
+    await prefs.remove('${kPhotoCursor}_id');
+    await prefs.remove('${kVideoCursor}_id');
+    await prefs.remove('${kGroupCursor}_id');
+  }
+
   Future<void> setPro(bool value) async {
     isPro = value;
     final prefs = await SharedPreferences.getInstance();
@@ -96,6 +146,15 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Permission + Load ────────────────────────────────────────────────────
 
+  /// Request/inspect photo access. Records whether access is only partial
+  /// ("Selected photos") so the UI can warn that not everything is visible.
+  Future<bool> _checkPermission() async {
+    final ps = await PhotoManager.requestPermissionExtend();
+    limitedAccess = ps == PermissionState.limited;
+    return ps == PermissionState.authorized ||
+        ps == PermissionState.limited;
+  }
+
   /// Lightweight startup: ask for permission and read only the photo *count*
   /// (metadata, very fast). We do NOT load every photo or build groups here —
   /// that heavy work is deferred until the user actually enters a cleanup mode
@@ -104,7 +163,7 @@ class AppProvider extends ChangeNotifier {
     state = AppState.loading;
     notifyListeners();
 
-    final granted = await _service.requestPermission();
+    final granted = await _checkPermission();
     if (!granted) {
       state = AppState.permissionDenied;
       notifyListeners();
@@ -122,6 +181,21 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  /// Load every photo, newest-first — on demand, cached. Used by Picture Swipe.
+  Future<List<AssetEntity>> ensurePhotos() async {
+    if (photosLoaded && allPhotos.isNotEmpty) return allPhotos;
+    await PhotoManager.releaseCache();
+    allPhotos = await _service.loadAllAssets();
+    sortAssetsNewestFirst(allPhotos);
+    photosLoaded = true;
+    if (allPhotos.length > _totalPhotos) {
+      _totalPhotos = allPhotos.length;
+      stats = _service.estimateStats(_totalPhotos, groups);
+      notifyListeners();
+    }
+    return allPhotos;
+  }
+
   /// Load the photo library and group it by time — on demand, and cached so it
   /// only runs once per scan. Call this when the user opens a cleanup mode
   /// (group review / swipe). Returns the resulting groups.
@@ -131,13 +205,16 @@ class AppProvider extends ChangeNotifier {
     isLoadingGroups = true;
     notifyListeners();
     try {
+      await PhotoManager.releaseCache();
       final all = await _service.loadAllAssets();
       _totalPhotos = all.length;
+      allPhotos = all;
+      photosLoaded = true;
       groups = await _service.groupAssets(all);
       groupsLoaded = true;
       stats = _service.estimateStats(_totalPhotos, groups);
-    } catch (_) {
-      // Leave groups empty; the caller handles the "nothing to clean" case.
+    } catch (e) {
+      debugPrint('ensureGroups failed: $e');
     } finally {
       isLoadingGroups = false;
       notifyListeners();
@@ -145,29 +222,84 @@ class AppProvider extends ChangeNotifier {
     return groups;
   }
 
-  /// Re-scan from scratch (clears the cached grouping and refreshes the count).
+  /// Re-scan from scratch: clears caches, re-reads the library from MediaStore,
+  /// and re-groups. Always starts every mode at the newest items afterward.
   Future<void> refresh() async {
+    state = AppState.loading;
     groups = [];
     groupsLoaded = false;
-    await prepare();
+    allPhotos = [];
+    photosLoaded = false;
+    await clearCursors();
+    notifyListeners();
+
+    final granted = await _checkPermission();
+    if (!granted) {
+      state = AppState.permissionDenied;
+      notifyListeners();
+      return;
+    }
+
+    try {
+      // Drop photo_manager's cached asset lists so we see deletions/additions.
+      await PhotoManager.releaseCache();
+
+      final all = await _service.loadAllAssets();
+      _totalPhotos = all.length;
+      allPhotos = all;
+      photosLoaded = true;
+      groups = await _service.groupAssets(all);
+      groupsLoaded = true;
+      stats = _service.estimateStats(_totalPhotos, groups);
+      state = AppState.ready;
+    } catch (e) {
+      debugPrint('refresh failed: $e');
+      state = AppState.error;
+    }
+    notifyListeners();
   }
 
   // ─── Delete ───────────────────────────────────────────────────────────────
 
   /// Delete the given assets in one batch (one system confirmation dialog).
-  /// Returns estimated bytes freed. No-op / 0 if the user denies.
+  /// Returns estimated bytes freed. No-op / 0 if the user denies or deletion
+  /// fails — callers must check before updating their local UI.
   Future<int> deleteAssets(List<AssetEntity> toDelete) async {
     if (toDelete.isEmpty) return 0;
+    final requestedIds = toDelete.map((a) => a.id).toList();
 
-    List<String> deletedIds;
     try {
-      deletedIds = await PhotoManager.editor.deleteWithIds(
-        toDelete.map((a) => a.id).toList(),
-      );
-    } catch (_) {
-      return 0; // user denied or an error occurred
+      await PhotoManager.editor.deleteWithIds(requestedIds);
+    } catch (e) {
+      // Deny or platform failure — verified below, so don't bail out yet.
+      debugPrint('deleteAssets: deleteWithIds threw: $e');
     }
-    if (deletedIds.isEmpty) return 0;
+
+    // Don't trust deleteWithIds' return value: on several Android versions /
+    // OEMs it returns an empty list after a successful delete, or a non-empty
+    // list without actually deleting. Ask MediaStore which assets are really
+    // gone and treat THAT as the result.
+    List<String> deletedIds = await _confirmDeleted(requestedIds);
+
+    // Fallback: nothing was removed → try the system trash (Android 11+).
+    // Trashed items disappear from the library, which is what the user wants,
+    // and the OS purges them after ~30 days.
+    if (deletedIds.isEmpty && Platform.isAndroid) {
+      try {
+        await PhotoManager.editor.android.moveToTrash(toDelete);
+      } catch (e) {
+        debugPrint('deleteAssets: moveToTrash fallback failed: $e');
+      }
+      deletedIds = await _confirmDeleted(requestedIds);
+    }
+
+    if (deletedIds.isEmpty) {
+      debugPrint(
+          'deleteAssets: user denied or nothing deleted (${toDelete.length} requested)');
+      return 0;
+    }
+    debugPrint(
+        'deleteAssets: ${deletedIds.length}/${requestedIds.length} confirmed deleted');
 
     final freed = deletedIds.length * kAvgPhotoBytes;
     freedBytes += freed;
@@ -177,8 +309,12 @@ class AppProvider extends ChangeNotifier {
     await prefs.setInt('freed_bytes', freedBytes);
     await prefs.setInt('deleted_count', deletedCount);
 
-    // Remove the actually-deleted assets from the groups.
+    // Remove the actually-deleted assets from the cached lists.
     final deletedSet = deletedIds.toSet();
+    if (photosLoaded) {
+      allPhotos =
+          allPhotos.where((a) => !deletedSet.contains(a.id)).toList();
+    }
     groups = groups
         .map((g) {
           final remaining =
@@ -194,6 +330,26 @@ class AppProvider extends ChangeNotifier {
 
     notifyListeners();
     return freed;
+  }
+
+  /// Re-query MediaStore and return the ids that no longer resolve — i.e. the
+  /// assets that were really deleted (or trashed). Drops photo_manager's
+  /// caches first so we don't get a stale "still exists" answer.
+  Future<List<String>> _confirmDeleted(List<String> ids) async {
+    try {
+      await PhotoManager.releaseCache();
+    } catch (_) {}
+    final gone = <String>[];
+    for (final id in ids) {
+      AssetEntity? entity;
+      try {
+        entity = await AssetEntity.fromId(id);
+      } catch (_) {
+        entity = null;
+      }
+      if (entity == null) gone.add(id);
+    }
+    return gone;
   }
 
   /// Skip a group (move to next without deleting).

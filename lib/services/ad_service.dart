@@ -153,16 +153,16 @@ class AdService {
   }
 
   /// Show a full-screen ad if one is ready AND the cooldown has elapsed, then
-  /// pre-load the next. No-op if not ready or shown too recently.
-  void showInterstitial() {
-    if (!_canRequestAds) return;
+  /// pre-load the next. Returns true if an ad was actually shown.
+  bool showInterstitial() {
+    if (!_canRequestAds) return false;
     final last = _lastInterstitial;
     if (last != null &&
         DateTime.now().difference(last) < _interstitialCooldown) {
-      return;
+      return false;
     }
     final ad = _interstitial;
-    if (ad == null) return;
+    if (ad == null) return false;
     _lastInterstitial = DateTime.now();
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
@@ -176,5 +176,6 @@ class AdService {
     );
     ad.show();
     _interstitial = null;
+    return true;
   }
 }

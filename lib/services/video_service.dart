@@ -1,5 +1,6 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../utils/asset_utils.dart';
 
 /// Level of access we have to the device's videos.
 enum VideoAccess {
@@ -19,6 +20,19 @@ enum VideoAccess {
 class VideoService {
   static const int maxVideosToScan = 20000;
 
+  static final FilterOptionGroup _newestFirstFilter = FilterOptionGroup(
+    videoOption: const FilterOption(
+      sizeConstraint: SizeConstraint(ignoreSize: true),
+    ),
+    // Disable the implicit "epoch .. now()" date filter — it hides assets
+    // with future timestamps (see PhotoService._newestFirstFilter).
+    createTimeCond: DateTimeCond.def().copyWith(ignore: true),
+    updateTimeCond: DateTimeCond.def().copyWith(ignore: true),
+    orders: [
+      const OrderOption(type: OrderOptionType.createDate, asc: false),
+    ],
+  );
+
   /// Request/check video access and report the level. On Android 13+ this is the
   /// separate READ_MEDIA_VIDEO permission — photo_manager won't prompt for it
   /// when photos are already granted, so we go through permission_handler.
@@ -29,16 +43,12 @@ class VideoService {
     }
 
     if (status.isGranted || status.isLimited) {
-      // OS permission in hand — tell photo_manager to query MediaStore directly
-      // instead of blocking on its own (image-only) permission cache.
-      await PhotoManager.setIgnorePermissionCheck(true);
+      await PhotoManager.requestPermissionExtend();
       return status.isLimited ? VideoAccess.limited : VideoAccess.granted;
     }
 
-    // Older Android: Permission.videos maps to storage.
     final st = await PhotoManager.requestPermissionExtend();
     if (st == PermissionState.authorized || st == PermissionState.limited) {
-      await PhotoManager.setIgnorePermissionCheck(true);
       return st == PermissionState.limited
           ? VideoAccess.limited
           : VideoAccess.granted;
@@ -46,39 +56,44 @@ class VideoService {
     return VideoAccess.denied;
   }
 
-  /// Open the app's system settings page (so the user can switch to "Allow all").
   Future<void> openSettings() => openAppSettings();
 
-  /// Number of video assets (metadata only — fast).
   Future<int> totalCount() async {
-    final albums = await PhotoManager.getAssetPathList(
-      type: RequestType.video,
-      onlyAll: true,
-    );
-    if (albums.isEmpty) return 0;
-    return albums.first.assetCountAsync;
+    final videos = await loadAllVideos();
+    return videos.length;
   }
 
-  /// All videos, newest first (metadata only). Merges every video album, since
-  /// the primary "all" album can be empty on some devices while videos live in
-  /// other albums (Camera, Downloads, WhatsApp, …).
+  /// Every video once (deduped), sorted newest-in-library first.
   Future<List<AssetEntity>> loadAllVideos() async {
-    final albums = await PhotoManager.getAssetPathList(type: RequestType.video);
+    await PhotoManager.releaseCache();
+
+    final albums = await PhotoManager.getAssetPathList(
+      type: RequestType.video,
+      filterOption: _newestFirstFilter,
+    );
     if (albums.isEmpty) return [];
 
     final seen = <String>{};
     final result = <AssetEntity>[];
-    for (final album in albums) {
+
+    final sortedAlbums = [...albums]
+      ..sort((a, b) {
+        if (a.isAll == b.isAll) return 0;
+        return a.isAll ? -1 : 1;
+      });
+
+    for (final album in sortedAlbums) {
       final count = await album.assetCountAsync;
       if (count == 0) continue;
       final end = count < maxVideosToScan ? count : maxVideosToScan;
-      final assets = await album.getAssetListRange(start: 0, end: end);
-      for (final a in assets) {
-        if (seen.add(a.id)) result.add(a);
+      final batch = await album.getAssetListRange(start: 0, end: end);
+      for (final asset in batch) {
+        if (seen.add(asset.id)) result.add(asset);
       }
       if (result.length >= maxVideosToScan) break;
     }
-    result.sort((a, b) => b.createDateTime.compareTo(a.createDateTime));
+
+    sortAssetsNewestFirst(result);
     return result;
   }
 }

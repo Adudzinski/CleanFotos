@@ -6,14 +6,17 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import '../models/photo_group.dart';
 import '../providers/app_provider.dart';
 import '../services/ad_service.dart';
+import '../utils/asset_utils.dart';
 import '../theme/app_theme.dart';
 import '../widgets/celebration_overlay.dart';
 import '../l10n/strings.dart';
 
 class SwipeScreen extends StatefulWidget {
-  final List<PhotoGroup> groups;
+  /// Every photo, newest-first — Picture Swipe lets the user swipe through the
+  /// whole library, not just duplicates.
+  final List<AssetEntity> photos;
 
-  const SwipeScreen({super.key, required this.groups});
+  const SwipeScreen({super.key, required this.photos});
 
   @override
   State<SwipeScreen> createState() => _SwipeScreenState();
@@ -61,15 +64,15 @@ class _SwipeScreenState extends State<SwipeScreen>
   bool _nativeAdLoaded = false;
   bool _showingAd = false;
   int _swipesSinceAd = 0;
+  bool _isCommitting = false;
+  bool _deletionsCommitted = false;
 
   @override
   void initState() {
     super.initState();
     _provider = context.read<AppProvider>();
-    // Flatten all group assets (skip the "best" first photo per group)
-    _queue = widget.groups
-        .expand((g) => g.assets.skip(1)) // skip first as "keep" candidate
-        .toList();
+    // Newest-in-library first (sorted in [AppProvider.ensurePhotos]).
+    _queue = List.of(widget.photos);
 
     _flyOut = AnimationController(
       vsync: this,
@@ -98,8 +101,9 @@ class _SwipeScreenState extends State<SwipeScreen>
 
   @override
   void dispose() {
-    // Flush any queued deletions if the user leaves before finishing.
-    _commitDeletions();
+    if (!_deletionsCommitted && _pendingDelete.isNotEmpty) {
+      _commitDeletions();
+    }
     _flyOut.dispose();
     _promote.dispose();
     _nativeAd?.dispose();
@@ -191,11 +195,44 @@ class _SwipeScreenState extends State<SwipeScreen>
   }
 
   /// Delete all queued photos in one batch (one permission dialog).
-  Future<void> _commitDeletions() async {
-    if (_pendingDelete.isEmpty) return;
+  /// Returns true if everything was deleted or the queue was empty.
+  Future<bool> _commitDeletions() async {
+    if (_pendingDelete.isEmpty) {
+      _deletionsCommitted = true;
+      return true;
+    }
+    if (_isCommitting) return false;
+    _isCommitting = true;
+
     final batch = List<AssetEntity>.from(_pendingDelete);
+    final batchCount = batch.length;
+    final batchBytes = batchCount * kAvgPhotoBytes;
     _pendingDelete.clear();
-    await _provider.deleteAssets(batch);
+
+    final freed = await _provider.deleteAssets(batch);
+    _isCommitting = false;
+
+    if (freed == 0) {
+      _pendingDelete.addAll(batch);
+      _deletedCount = (_deletedCount - batchCount).clamp(0, _deletedCount);
+      _freedBytes = (_freedBytes - batchBytes).clamp(0, _freedBytes);
+      if (mounted) {
+        final s = AppStrings.of(_provider.languageCode);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.deleteFailed)),
+        );
+      }
+      return false;
+    }
+
+    _deletionsCommitted = true;
+    return true;
+  }
+
+  Future<void> _exitSwipe() async {
+    if (_isCommitting) return;
+    final ok = await _commitDeletions();
+    if (mounted && ok) Navigator.of(context).pop();
   }
 
   bool get _done => _current >= _queue.length;
@@ -305,15 +342,24 @@ class _SwipeScreenState extends State<SwipeScreen>
     final provider = context.watch<AppProvider>();
     final s = AppStrings.of(provider.languageCode);
 
-    return CelebrationOverlay(
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _exitSwipe();
+      },
+      child: CelebrationOverlay(
+        child: Scaffold(
           backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          title: Text(s.swipeMode,
-              style: const TextStyle(color: Colors.white)),
-          actions: [
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text(s.swipeMode,
+                style: const TextStyle(color: Colors.white)),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _exitSwipe,
+            ),
+            actions: [
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Center(
@@ -330,6 +376,7 @@ class _SwipeScreenState extends State<SwipeScreen>
         ),
         body: _done ? _buildDoneScreen(context, s) : _buildSwipeArea(context, s),
       ),
+    ),
     );
   }
 
@@ -551,7 +598,7 @@ class _SwipeScreenState extends State<SwipeScreen>
               ),
               padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
               child: Text(
-                _formatDate(asset.createDateTime),
+                _formatDate(librarySortTime(asset)),
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -678,7 +725,7 @@ class _SwipeScreenState extends State<SwipeScreen>
             ),
             const SizedBox(height: 40),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: _exitSwipe,
               child: Text(s.backHome),
             ),
           ],

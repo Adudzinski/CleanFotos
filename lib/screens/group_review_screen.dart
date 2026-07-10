@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../models/photo_group.dart';
 import '../providers/app_provider.dart';
+import '../utils/asset_utils.dart';
 import '../theme/app_theme.dart';
 import '../widgets/photo_card.dart';
 import '../widgets/celebration_overlay.dart';
@@ -70,10 +71,22 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     final lang = provider.languageCode;
     final s = AppStrings.of(lang);
 
-    final toDelete =
-        _visible.where((a) => _selectedIds.contains(a.id)).toList();
+    final toDelete = [
+      ..._visible.where((a) => _selectedIds.contains(a.id)),
+      ..._queue.where((a) => _selectedIds.contains(a.id)),
+    ];
+    if (toDelete.isEmpty) return;
 
     final freed = await provider.deleteAssets(toDelete);
+
+    if (freed == 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(s.deleteFailed)),
+        );
+      }
+      return;
+    }
 
     // Celebration
     final celebrationState = CelebrationOverlay.of(context);
@@ -238,7 +251,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _formatDate(group.groupDate),
+                  _formatDate(_groupDisplayDate(group)),
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700),
                 ),
@@ -376,6 +389,12 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
         ],
       ),
     );
+  }
+
+  DateTime _groupDisplayDate(PhotoGroup group) {
+    return group.assets
+        .map(librarySortTime)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
   }
 
   String _formatDate(DateTime dt) {

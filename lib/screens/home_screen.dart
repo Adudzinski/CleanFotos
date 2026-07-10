@@ -5,6 +5,7 @@ import '../providers/app_provider.dart';
 import '../services/ad_service.dart';
 import '../theme/app_theme.dart';
 import '../services/purchase_service.dart';
+import '../services/review_service.dart';
 import '../services/video_service.dart';
 import '../widgets/banner_ad_widget.dart';
 import '../widgets/coachmark_overlay.dart';
@@ -22,19 +23,21 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
 
   // Targets for the first-launch onboarding tour.
   final GlobalKey _groupCardKey = GlobalKey();
   final GlobalKey _swipeCardKey = GlobalKey();
+  final GlobalKey _videoCardKey = GlobalKey();
 
   final VideoService _videoService = VideoService();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -50,8 +53,21 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     super.dispose();
+  }
+
+  /// Granting a permission in system Settings does NOT restart the app (only
+  /// revoking does), so when the user comes back we must re-check — otherwise
+  /// the home screen stays stuck on "photo access required" forever.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    final provider = context.read<AppProvider>();
+    if (provider.state == AppState.permissionDenied) {
+      provider.prepare();
+    }
   }
 
   @override
@@ -61,8 +77,36 @@ class _HomeScreenState extends State<HomeScreen>
     final s = AppStrings.of(lang);
 
     final showCoach = provider.state == AppState.ready &&
-        !provider.onboardingSeen &&
-        provider.stats.totalPhotos > 0;
+        !provider.onboardingSeen;
+
+    List<CoachStep> _coachSteps() {
+      final steps = <CoachStep>[];
+      final hasPhotoModes =
+          provider.stats.totalPhotos > 0 &&
+              (!provider.groupsLoaded || provider.groups.isNotEmpty);
+      if (hasPhotoModes) {
+        steps.add(CoachStep(
+          targetKey: _groupCardKey,
+          title: s.groupMode,
+          body: s.groupModeDesc,
+        ));
+      }
+      if (provider.stats.totalPhotos > 0) {
+        steps.add(CoachStep(
+          targetKey: _swipeCardKey,
+          title: s.swipeMode,
+          body: s.swipeModeDesc,
+        ));
+      }
+      steps.add(CoachStep(
+        targetKey: _videoCardKey,
+        title: s.videoMode,
+        body: s.videoModeDesc,
+      ));
+      return steps;
+    }
+
+    final coachSteps = showCoach ? _coachSteps() : const <CoachStep>[];
 
     return Scaffold(
       body: Stack(
@@ -79,19 +123,10 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
           ),
-          if (showCoach)
+          if (showCoach && coachSteps.isNotEmpty)
             Positioned.fill(
               child: CoachmarkOverlay(
-                steps: [
-                  CoachStep(
-                      targetKey: _groupCardKey,
-                      title: s.groupMode,
-                      body: s.groupModeDesc),
-                  CoachStep(
-                      targetKey: _swipeCardKey,
-                      title: s.swipeMode,
-                      body: s.swipeModeDesc),
-                ],
+                steps: coachSteps,
                 nextLabel: s.coachNext,
                 doneLabel: s.coachDone,
                 onFinish: () => provider.markOnboardingSeen(),
@@ -109,47 +144,59 @@ class _HomeScreenState extends State<HomeScreen>
   /// user's place. We only show a quick interstitial. (The user can still pull
   /// "Refresh" for a fresh scan.)
   void _afterMode(AppProvider provider) {
-    if (provider.adsEnabled) AdService.instance.showInterstitial();
+    final shownAd =
+        provider.adsEnabled && AdService.instance.showInterstitial();
+    // If no ad appeared, it's a good moment to ask for a rating instead
+    // (so we never stack an ad and a review prompt at once).
+    if (!shownAd) {
+      ReviewService.instance.maybeAsk(provider.deletedCount);
+    }
   }
 
-  /// Open a cleanup mode, loading + grouping the photos on demand. If grouping
-  /// hasn't run yet, we show a brief loading dialog while it does (this is the
-  /// only point we touch the whole library), then navigate.
+  /// Open a cleanup mode, loading data on demand behind a brief loading dialog.
+  /// Picture Swipe uses every photo (newest-first); Group Review uses the
+  /// time-grouped duplicates.
   Future<void> _openMode(
     BuildContext context,
     AppProvider provider,
     AppStrings s, {
     required bool swipe,
   }) async {
-    if (!provider.groupsLoaded) {
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(
-          child: CircularProgressIndicator(color: AppTheme.primary),
-        ),
-      );
-      await provider.ensureGroups();
-      if (!context.mounted) return;
-      Navigator.of(context).pop(); // close the loading dialog
-    }
-
-    final groups = provider.groups;
-    if (groups.isEmpty) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(s.allClean)));
-      return;
-    }
-
-    if (!context.mounted) return;
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            swipe ? SwipeScreen(groups: groups) : GroupReviewScreen(groups: groups),
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: AppTheme.primary),
       ),
-    ).then((_) => _afterMode(provider));
+    );
+
+    if (swipe) {
+      final photos = await provider.ensurePhotos();
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // close loading dialog
+      if (photos.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(s.allClean)));
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => SwipeScreen(photos: photos)),
+      ).then((_) => _afterMode(provider));
+    } else {
+      final groups = await provider.ensureGroups();
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // close loading dialog
+      if (groups.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(s.allClean)));
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GroupReviewScreen(groups: groups)),
+      ).then((_) => _afterMode(provider));
+    }
   }
 
   /// Load all videos on demand, then open the video swipe deck.
@@ -355,6 +402,12 @@ class _HomeScreenState extends State<HomeScreen>
             onPressed: () => PhotoManager.openSetting(),
             child: Text(s.openSettings),
           ),
+          const SizedBox(height: 12),
+          // Manual re-check, in case the lifecycle callback didn't fire.
+          OutlinedButton(
+            onPressed: () => context.read<AppProvider>().prepare(),
+            child: Text(s.retry),
+          ),
         ],
       ),
     );
@@ -389,11 +442,17 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Partial access warning — the app only sees a subset of the library.
+          if (provider.limitedAccess) ...[
+            _buildLimitedAccessBanner(context, s),
+            const SizedBox(height: 14),
+          ],
+
           // ── Cleanup actions (front and center) ───────────────────────────
           // The modes load + group photos on demand (see _openMode), so they're
           // available as soon as the library has photos — no upfront scan.
+          // Group review — only when there are (or might be) duplicate groups.
           if (!provider.groupsLoaded || groupCount > 0) ...[
-            // Group review mode
             _buildModeCard(
               context,
               cardKey: _groupCardKey,
@@ -405,8 +464,10 @@ class _HomeScreenState extends State<HomeScreen>
               onTap: () => _openMode(context, provider, s, swipe: false),
             ),
             const SizedBox(height: 14),
+          ],
 
-            // Swipe mode
+          // Picture swipe — every photo in the library.
+          if (provider.stats.totalPhotos > 0) ...[
             _buildModeCard(
               context,
               cardKey: _swipeCardKey,
@@ -414,15 +475,16 @@ class _HomeScreenState extends State<HomeScreen>
               title: s.swipeMode,
               subtitle: s.swipeModeDesc,
               gradient: const [AppTheme.secondary, Color(0xFFE84A6F)],
-              enabled: provider.stats.totalPhotos > 0,
+              enabled: true,
               onTap: () => _openMode(context, provider, s, swipe: true),
             ),
+            const SizedBox(height: 14),
           ],
 
-          // Video cleanup — its own distinct mode, always available.
-          const SizedBox(height: 14),
+          // Video cleanup — always available.
           _buildModeCard(
             context,
+            cardKey: _videoCardKey,
             icon: Icons.video_library_rounded,
             title: s.videoMode,
             subtitle: s.videoModeDesc,
@@ -499,6 +561,51 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// Warning card shown when the OS only granted access to selected photos —
+  /// the single most common reason "not all my pictures show up". Tapping it
+  /// opens the app's permission settings.
+  Widget _buildLimitedAccessBanner(BuildContext context, AppStrings s) {
+    return GestureDetector(
+      onTap: () => PhotoManager.openSetting(),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF3E0),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFF57C00)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: Color(0xFFF57C00), size: 32),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.limitedAccessTitle,
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFE65100))),
+                  const SizedBox(height: 4),
+                  Text(s.limitedAccessBody,
+                      style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.35,
+                          color: Color(0xFF7A4A00))),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: Color(0xFFF57C00), size: 20),
+          ],
+        ),
       ),
     );
   }
