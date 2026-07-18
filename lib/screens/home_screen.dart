@@ -240,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => VideoSwipeScreen(videos: videos)),
-    ).then((_) => _afterMode(provider));
+    ).then((_) => _afterMode(provider, deletedBefore));
   }
 
   /// Explains that full video access is needed and offers to open Settings.
