@@ -1,0 +1,108 @@
+# CleanFotos — Codemagic CI/CD
+# Docs: https://docs.codemagic.io/yaml-quick-start/building-a-flutter/
+#
+# Before the first build, complete the one-time Apple + Codemagic setup
+# described in the chat / RELEASE notes:
+#   1. App Store Connect API key → Codemagic Team integrations → Developer Portal
+#   2. Register bundle ID com.crocodata.cleanpics (or let Codemagic create it)
+#   3. Create the app in App Store Connect
+#   4. Set APP_STORE_APPLE_ID below (numeric App ID from App Store Connect)
+
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    # Must match the key name you save in Codemagic:
+    # Team integrations → Developer Portal → Manage keys
+    integrations:
+      app_store_connect: CleanPics
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.crocodata.cleanpics
+      vars:
+        # App Store Connect → My Apps → CleanFotos → App Information → Apple ID
+        # (numeric, e.g. 6751234567). Leave empty until the app exists; then
+        # paste it here so build numbers auto-increment from TestFlight.
+        APP_STORE_APPLE_ID: ""
+
+    scripts:
+      - name: Set up code signing settings on Xcode project
+        script: xcode-project use-profiles
+
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+
+      - name: Flutter build IPA
+        script: |
+          # Auto-bump CFBundleVersion from the latest TestFlight build when
+          # APP_STORE_APPLE_ID is set; otherwise use the pubspec build number.
+          BUILD_NUMBER="$(
+            if [ -n "${APP_STORE_APPLE_ID:-}" ]; then
+              LATEST="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)"
+              if [ -n "$LATEST" ] && [ "$LATEST" != "0" ]; then
+                echo $((LATEST + 1))
+              else
+                echo "${PROJECT_BUILD_NUMBER:-$(grep '^version:' pubspec.yaml | sed 's/.*+//')}"
+              fi
+            else
+              echo "${PROJECT_BUILD_NUMBER:-$(grep '^version:' pubspec.yaml | sed 's/.*+//')}"
+            fi
+          )"
+          BUILD_NAME="$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')"
+          echo "Building $BUILD_NAME ($BUILD_NUMBER)"
+          flutter build ipa --release \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+
+    publishing:
+      email:
+        recipients:
+          - contact@crocodata.net
+        notify:
+          success: true
+          failure: true
+
+      app_store_connect:
+        auth: integration
+        # Upload to TestFlight. Turn on App Store submission only after
+        # screenshots, privacy answers, and IAP are ready in App Store Connect.
+        submit_to_testflight: true
+        # submit_to_app_store: true
+
+  # Optional: compile-only check (no Apple credentials required).
+  ios-unsigned:
+    name: iOS unsigned smoke build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+      - name: Build iOS without code signing
+        script: flutter build ios --release --no-codesign
+    artifacts:
+      - build/ios/iphoneos/**/*.app
+      - /tmp/xcodebuild_logs/*.log

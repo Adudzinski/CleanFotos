@@ -106,7 +106,7 @@ class _CoachmarkOverlayState extends State<CoachmarkOverlay> {
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -126,7 +126,7 @@ class _CoachmarkOverlayState extends State<CoachmarkOverlay> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(step.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: AppTheme.textPrimary)),
@@ -135,7 +135,7 @@ class _CoachmarkOverlayState extends State<CoachmarkOverlay> {
           ),
           const SizedBox(height: 8),
           Text(step.body,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 15,
                   color: AppTheme.textSecondary,
                   height: 1.4)),

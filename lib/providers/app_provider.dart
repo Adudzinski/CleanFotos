@@ -48,6 +48,9 @@ class AppProvider extends ChangeNotifier {
   bool isPro = false;
   bool onboardingSeen = false;
 
+  /// Theme preference: 'system' (default), 'light' or 'dark'.
+  String themePref = 'system';
+
   /// Ads show unless the user has unlocked Pro.
   bool get adsEnabled => !isPro;
 
@@ -61,6 +64,7 @@ class AppProvider extends ChangeNotifier {
     languageCode = prefs.getString('language_code') ?? _deviceLanguage();
     isPro = prefs.getBool('is_pro') ?? false;
     onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
+    themePref = prefs.getString('theme_pref') ?? 'system';
     notifyListeners();
 
     // Only gather ad consent / initialize ads for non-Pro users. Pro users get
@@ -368,6 +372,17 @@ class AppProvider extends ChangeNotifier {
     // Re-schedule the reminder so its text matches the new language.
     await _setupReminders();
   }
+
+  Future<void> setThemePref(String value) async {
+    themePref = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('theme_pref', value);
+  }
+
+  /// Called by the app root when the system brightness changes, so screens
+  /// rebuild with the updated AppTheme palette.
+  void refreshTheme() => notifyListeners();
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 

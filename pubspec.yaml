@@ -86,7 +86,8 @@ flutter_native_splash:
 # App icon generation — run: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
+  remove_alpha_ios: true
   image_path: "assets/icon/icon_legacy.png"
   adaptive_icon_background: "#EFEEFC"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"

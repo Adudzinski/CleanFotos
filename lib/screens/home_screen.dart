@@ -277,7 +277,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           const SizedBox(width: 12),
           Text(
-            'CleanPics',
+            'CleanFotos',
             style: Theme.of(context).textTheme.headlineLarge,
           ),
           const Spacer(),
@@ -317,7 +317,7 @@ class _HomeScreenState extends State<HomeScreen>
           const CircularProgressIndicator(color: AppTheme.primary),
           const SizedBox(height: 24),
           Text(s.analyzingPhotos,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textSecondary)),
@@ -385,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.lock_outline, size: 72, color: AppTheme.textSecondary),
+          Icon(Icons.lock_outline, size: 72, color: AppTheme.textSecondary),
           const SizedBox(height: 24),
           Text(s.permissionTitle,
               style: Theme.of(context).textTheme.headlineLarge,
@@ -664,14 +664,14 @@ class _HomeScreenState extends State<HomeScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(s.freedSpace,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.textSecondary)),
                 const SizedBox(height: 4),
                 Text(
                   provider.freedFormatted,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
                       color: AppTheme.textPrimary),
@@ -679,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const SizedBox(height: 2),
                 Text(
                   '${s.deletedPhotos}: ${provider.deletedCount}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textSecondary),
@@ -719,13 +719,13 @@ class _HomeScreenState extends State<HomeScreen>
             Icon(icon, color: color, size: 24),
             const SizedBox(height: 8),
             Text(value,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w800,
                     color: AppTheme.textPrimary)),
             const SizedBox(height: 4),
             Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 16,
                     color: AppTheme.textSecondary,
                     fontWeight: FontWeight.w600)),

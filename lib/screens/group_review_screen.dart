@@ -209,7 +209,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
               Text(
                 s.groupOf(
                     _currentIndex + 1, widget.groups.length),
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textSecondary),
@@ -259,11 +259,11 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined,
+                      Icon(Icons.location_on_outlined,
                           size: 13, color: AppTheme.textSecondary),
                       const SizedBox(width: 3),
                       Text(group.location!,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 16,
                               color: AppTheme.textSecondary)),
                     ],
@@ -327,7 +327,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                 ? s.tapToDeselect
                 : s.tapToSelectDelete,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 17,
                 color: AppTheme.textSecondary,
                 fontWeight: FontWeight.w600),
@@ -336,7 +336,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
           Text(
             s.recoverHint,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 16, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 12),

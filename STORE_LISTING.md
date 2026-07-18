@@ -12,7 +12,7 @@ Everything needed for the Play Console listing, in one place.
 | Category | Tools / Productivity (App, not Game) |
 | Pricing | Free (with ads) |
 | Privacy policy URL | https://crocodata.net/cleanpics/privacy-policy.html |
-| Developer contact | fotopostprint@gmail.com |
+| Developer contact | contact@crocodata.net |
 
 ## In-app product (one-time)
 

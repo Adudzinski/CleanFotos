@@ -42,6 +42,12 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
+          // ── Design (System / Light / Dark) ────────────────────────────────
+          _sectionHeader(s.theme),
+          _themeCard(context, provider, s),
+
+          const SizedBox(height: 24),
+
           // ── Remove Ads ────────────────────────────────────────────────────
           _sectionHeader(s.removeAds),
           _proCard(context, provider, s),
@@ -61,7 +67,7 @@ class SettingsScreen extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 10),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
@@ -175,6 +181,54 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  Widget _themeCard(
+      BuildContext context, AppProvider provider, AppStrings s) {
+    final options = [
+      {'value': 'system', 'label': s.themeSystem, 'icon': Icons.brightness_auto},
+      {'value': 'light', 'label': s.themeLight, 'icon': Icons.light_mode_outlined},
+      {'value': 'dark', 'label': s.themeDark, 'icon': Icons.dark_mode_outlined},
+    ];
+
+    return _card(
+      child: Column(
+        children: options.map((opt) {
+          final selected = provider.themePref == opt['value'];
+          return InkWell(
+            onTap: () => provider.setThemePref(opt['value'] as String),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(opt['icon'] as IconData,
+                      size: 22,
+                      color: selected
+                          ? AppTheme.primary
+                          : AppTheme.textSecondary),
+                  const SizedBox(width: 14),
+                  Text(opt['label'] as String,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w400,
+                        color: selected
+                            ? AppTheme.primary
+                            : AppTheme.textPrimary,
+                      )),
+                  const Spacer(),
+                  if (selected)
+                    const Icon(Icons.check_circle,
+                        color: AppTheme.primary, size: 22),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _proCard(
       BuildContext context, AppProvider provider, AppStrings s) {
     // Already unlocked
@@ -187,7 +241,7 @@ class SettingsScreen extends StatelessWidget {
             const SizedBox(width: 14),
             Expanded(
               child: Text(s.proUnlocked,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
                       color: AppTheme.textPrimary)),
@@ -214,7 +268,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(s.proDesc,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 16,
                   color: AppTheme.textSecondary,
                   height: 1.4)),
@@ -238,7 +292,7 @@ class SettingsScreen extends StatelessWidget {
               child: TextButton(
                 onPressed: () => purchase.restore(),
                 child: Text(s.restorePurchase,
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: AppTheme.textSecondary,
                         fontWeight: FontWeight.w600)),
               ),
@@ -265,7 +319,7 @@ class SettingsScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Text(s.rateApp,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 17, color: AppTheme.textSecondary)),
                   const Spacer(),
                   const Icon(Icons.star_rounded,
@@ -282,10 +336,10 @@ class SettingsScreen extends StatelessWidget {
               child: Row(
                 children: [
                   Text(s.privacyPolicy,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 17, color: AppTheme.textSecondary)),
                   const Spacer(),
-                  const Icon(Icons.open_in_new,
+                  Icon(Icons.open_in_new,
                       size: 20, color: AppTheme.textSecondary),
                 ],
               ),
@@ -300,10 +354,10 @@ class SettingsScreen extends StatelessWidget {
                 child: Row(
                   children: [
                     Text(s.privacyOptions,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 17, color: AppTheme.textSecondary)),
                     const Spacer(),
-                    const Icon(Icons.tune,
+                    Icon(Icons.tune,
                         size: 20, color: AppTheme.textSecondary),
                   ],
                 ),
@@ -335,7 +389,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Text(label,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 17, color: AppTheme.textSecondary)),
           ),
           const SizedBox(width: 8),
@@ -355,7 +409,7 @@ class SettingsScreen extends StatelessWidget {
       child: Row(
         children: [
           Text(label,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 17, color: AppTheme.textSecondary)),
           const Spacer(),
           Text(value,
@@ -366,8 +420,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _divider() =>
-      const Divider(height: 1, color: Color(0xFFF0F0F4));
+  Widget _divider() => Divider(height: 1, color: AppTheme.divider);
 
   Widget _card({required Widget child}) {
     return Container(

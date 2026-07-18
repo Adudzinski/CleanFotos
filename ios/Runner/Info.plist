@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>CleanPics</string>
+	<string>CleanFotos</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>cleanfotos_app</string>
+	<string>CleanFotos</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -42,9 +42,9 @@
 
 	<!-- Photo Library Permissions -->
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>CleanPics needs access to your photos to find and remove duplicates, freeing up storage space.</string>
+	<string>CleanFotos needs access to your photos to find and remove duplicates, freeing up storage space.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>CleanPics needs access to save photos back to your library.</string>
+	<string>CleanFotos needs access to save photos back to your library.</string>
 
 	<!-- AdMob App ID — replace with your real ID -->
 	<key>GADApplicationIdentifier</key>
