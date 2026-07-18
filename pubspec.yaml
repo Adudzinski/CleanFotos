@@ -74,13 +74,19 @@ flutter:
 
 # Launch/splash screen — run: dart run flutter_native_splash:create
 flutter_native_splash:
+  # Light mode
   color: "#EFEEFC"
   image: assets/icon/splash_logo.png
+  # Dark mode — matches the system theme so the launch screen isn't a light flash
+  color_dark: "#12111C"
+  image_dark: assets/icon/splash_logo.png
   android_12:
     image: assets/icon/splash_a12.png
     icon_background_color: "#EFEEFC"
+    image_dark: assets/icon/splash_a12.png
+    icon_background_color_dark: "#12111C"
   android: true
-  ios: false
+  ios: true
   web: false
 
 # App icon generation — run: dart run flutter_launcher_icons

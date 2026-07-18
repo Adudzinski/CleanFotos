@@ -143,9 +143,14 @@ class _HomeScreenState extends State<HomeScreen>
   /// groups live, so re-scanning would just show a loading screen and lose the
   /// user's place. We only show a quick interstitial. (The user can still pull
   /// "Refresh" for a fresh scan.)
-  void _afterMode(AppProvider provider) {
-    final shownAd =
-        provider.adsEnabled && AdService.instance.showInterstitial();
+  void _afterMode(AppProvider provider, int deletedBefore) {
+    // Only interrupt with an interstitial if the user actually cleaned up
+    // something in this session (and the 4-min cooldown has elapsed). Exiting
+    // a mode without deleting never triggers an ad.
+    final didDelete = provider.deletedCount > deletedBefore;
+    final shownAd = didDelete &&
+        provider.adsEnabled &&
+        AdService.instance.showInterstitial();
     // If no ad appeared, it's a good moment to ask for a rating instead
     // (so we never stack an ad and a review prompt at once).
     if (!shownAd) {
@@ -162,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen>
     AppStrings s, {
     required bool swipe,
   }) async {
+    final deletedBefore = provider.deletedCount;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -182,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen>
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => SwipeScreen(photos: photos)),
-      ).then((_) => _afterMode(provider));
+      ).then((_) => _afterMode(provider, deletedBefore));
     } else {
       final groups = await provider.ensureGroups();
       if (!context.mounted) return;
@@ -195,13 +201,14 @@ class _HomeScreenState extends State<HomeScreen>
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => GroupReviewScreen(groups: groups)),
-      ).then((_) => _afterMode(provider));
+      ).then((_) => _afterMode(provider, deletedBefore));
     }
   }
 
   /// Load all videos on demand, then open the video swipe deck.
   Future<void> _openVideoMode(
       BuildContext context, AppProvider provider, AppStrings s) async {
+    final deletedBefore = provider.deletedCount;
     final access = await _videoService.ensureAccess();
     if (!context.mounted) return;
 

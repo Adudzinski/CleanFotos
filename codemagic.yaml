@@ -23,14 +23,14 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      # Add APP_STORE_APPLE_ID in the Codemagic UI under a group named "appstore"
+      # (App Store Connect → your app → App Information → Apple ID, the number).
+      # It's optional — without it the build number falls back to pubspec.
+      groups:
+        - appstore
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.crocodata.cleanpics
-      vars:
-        # App Store Connect → My Apps → CleanFotos → App Information → Apple ID
-        # (numeric, e.g. 6751234567). Leave empty until the app exists; then
-        # paste it here so build numbers auto-increment from TestFlight.
-        APP_STORE_APPLE_ID: ""
 
     scripts:
       - name: Set up code signing settings on Xcode project

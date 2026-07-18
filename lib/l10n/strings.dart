@@ -59,7 +59,7 @@ class AppStrings {
   String saveUpTo(String size) => 'Save ~$size';
   String get tapToSelectDelete => 'Tap photos to mark for deletion';
   String get tapToDeselect => 'Tap again to deselect';
-  String get continueBtn => 'Skip';
+  String get continueBtn => 'Next';
   String get deleteBtn => 'Delete';
   String deleteCount(int n) => 'Delete ($n)';
   String get remaining => 'left';
@@ -185,7 +185,7 @@ class _SpanishStrings extends AppStrings {
   @override String photosInGroup(int n) => '$n fotos';
   @override String get tapToSelectDelete => 'Toca para marcar y borrar';
   @override String get tapToDeselect => 'Toca de nuevo para deseleccionar';
-  @override String get continueBtn => 'Saltar';
+  @override String get continueBtn => 'Siguiente';
   @override String get deleteBtn => 'Eliminar';
   @override String deleteCount(int n) => 'Eliminar ($n)';
   @override String get remaining => 'restantes';
@@ -281,7 +281,7 @@ class _GermanStrings extends AppStrings {
   @override String photosInGroup(int n) => '$n Fotos';
   @override String get tapToSelectDelete => 'Tippe, um zum Löschen zu markieren';
   @override String get tapToDeselect => 'Nochmal tippen zum Abwählen';
-  @override String get continueBtn => 'Überspringen';
+  @override String get continueBtn => 'Weiter';
   @override String get deleteBtn => 'Löschen';
   @override String deleteCount(int n) => 'Löschen ($n)';
   @override String get remaining => 'verbleibend';
@@ -377,7 +377,7 @@ class _FrenchStrings extends AppStrings {
   @override String photosInGroup(int n) => '$n photos';
   @override String get tapToSelectDelete => 'Appuyez pour marquer à supprimer';
   @override String get tapToDeselect => 'Appuyez à nouveau pour déselectionner';
-  @override String get continueBtn => 'Passer';
+  @override String get continueBtn => 'Suivant';
   @override String get deleteBtn => 'Supprimer';
   @override String deleteCount(int n) => 'Supprimer ($n)';
   @override String get remaining => 'restantes';
@@ -473,7 +473,7 @@ class _PortugueseStrings extends AppStrings {
   @override String photosInGroup(int n) => '$n fotos';
   @override String get tapToSelectDelete => 'Toque para marcar para deletar';
   @override String get tapToDeselect => 'Toque novamente para desmarcar';
-  @override String get continueBtn => 'Pular';
+  @override String get continueBtn => 'Próximo';
   @override String get deleteBtn => 'Deletar';
   @override String deleteCount(int n) => 'Deletar ($n)';
   @override String get remaining => 'restantes';
@@ -569,7 +569,7 @@ class _ItalianStrings extends AppStrings {
   @override String photosInGroup(int n) => '$n foto';
   @override String get tapToSelectDelete => 'Tocca per selezionare da eliminare';
   @override String get tapToDeselect => 'Tocca di nuovo per deselezionare';
-  @override String get continueBtn => 'Salta';
+  @override String get continueBtn => 'Avanti';
   @override String get deleteBtn => 'Elimina';
   @override String deleteCount(int n) => 'Elimina ($n)';
   @override String get remaining => 'rimanenti';

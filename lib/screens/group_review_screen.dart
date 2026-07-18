@@ -22,14 +22,10 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   late List<PhotoGroup> _groups;
   int _currentIndex = 0;
 
-  /// The 4 assets currently visible
-  final List<AssetEntity> _visible = [];
-  /// Assets queued but not yet visible (rest of the group)
-  final List<AssetEntity> _queue = [];
+  /// All photos in the current group (scrollable). Shrinks as photos are deleted.
+  final List<AssetEntity> _photos = [];
   /// Selected for deletion
   final Set<String> _selectedIds = {};
-
-  static const int _pageSize = 4;
 
   @override
   void initState() {
@@ -40,14 +36,10 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
 
   void _loadGroup(int index) {
     if (index >= _groups.length) return;
-    final group = _groups[index];
     _selectedIds.clear();
-
-    final all = group.assets;
-    _visible.clear();
-    _visible.addAll(all.take(_pageSize));
-    _queue.clear();
-    _queue.addAll(all.skip(_pageSize));
+    _photos
+      ..clear()
+      ..addAll(_groups[index].assets);
   }
 
   PhotoGroup get _currentGroup => _groups[_currentIndex];
@@ -68,13 +60,10 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     if (_selectedIds.isEmpty) return;
 
     final provider = context.read<AppProvider>();
-    final lang = provider.languageCode;
-    final s = AppStrings.of(lang);
+    final s = AppStrings.of(provider.languageCode);
 
-    final toDelete = [
-      ..._visible.where((a) => _selectedIds.contains(a.id)),
-      ..._queue.where((a) => _selectedIds.contains(a.id)),
-    ];
+    final toDelete =
+        _photos.where((a) => _selectedIds.contains(a.id)).toList();
     if (toDelete.isEmpty) return;
 
     final freed = await provider.deleteAssets(toDelete);
@@ -88,51 +77,22 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       return;
     }
 
-    // Celebration
-    final celebrationState = CelebrationOverlay.of(context);
-    final msg = s.deleted(toDelete.length, _formatBytes(freed));
-    celebrationState?.celebrate(msg);
+    CelebrationOverlay.of(context)
+        ?.celebrate(s.deleted(toDelete.length, _formatBytes(freed)));
 
-    // Remove deleted from visible, fill from queue
-    _visible.removeWhere((a) => _selectedIds.contains(a.id));
-    _selectedIds.clear();
-
-    // Fill up to _pageSize from queue
-    while (_visible.length < _pageSize && _queue.isNotEmpty) {
-      _visible.add(_queue.removeAt(0));
-    }
-
-    // If group now has < 2 visible, move on
-    if (_visible.length < 2) {
-      _advanceGroup();
-    } else {
-      setState(() {});
-    }
+    // Remove the deleted photos; the rest reflow up. We do NOT auto-advance —
+    // the user stays on this group and taps "Next" when they're done.
+    setState(() {
+      final del = Set<String>.from(_selectedIds);
+      _photos.removeWhere((a) => del.contains(a.id));
+      _selectedIds.clear();
+    });
   }
 
   void _advanceGroup() {
     if (_hasMore) {
       setState(() {
         _currentIndex++;
-        _loadGroup(_currentIndex);
-      });
-    } else {
-      Navigator.pop(context);
-    }
-  }
-
-  void _skipGroup() {
-    context.read<AppProvider>().skipGroup(_currentGroup.id);
-    if (_hasMore) {
-      setState(() {
-        _groups.removeAt(_currentIndex);
-        if (_currentIndex >= _groups.length) {
-          _currentIndex = _groups.length - 1;
-        }
-        if (_groups.isEmpty) {
-          Navigator.pop(context);
-          return;
-        }
         _loadGroup(_currentIndex);
       });
     } else {
@@ -153,7 +113,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     }
 
     final group = _currentGroup;
-    final remaining = _queue.length + _visible.length;
+    final remaining = _photos.length;
     final totalInGroup = group.totalCount;
 
     return CelebrationOverlay(
@@ -278,7 +238,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   }
 
   Widget _buildPhotoGrid(BuildContext context, AppStrings s) {
-    final int count = _visible.length;
+    // All photos in the group, in a scrollable grid (same tile size as before).
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -286,11 +246,10 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
         mainAxisSpacing: 12,
         childAspectRatio: 0.92,
       ),
-      itemCount: count,
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
+      padding: const EdgeInsets.only(bottom: 12),
+      itemCount: _photos.length,
       itemBuilder: (context, i) {
-        final asset = _visible[i];
+        final asset = _photos[i];
         final selected = _selectedIds.contains(asset.id);
         return PhotoCard(
           asset: asset,
@@ -345,7 +304,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
               // Continue / Skip
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: _skipGroup,
+                  onPressed: _advanceGroup,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,

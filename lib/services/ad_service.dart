@@ -37,12 +37,15 @@ class AdService {
 
   // ── Real (production) unit IDs from the AdMob console ───────────────────────
   // Leave a value empty until that unit is created → it falls back to a test ID.
+  // Android — do not change; shared codebase with iOS.
   static const _androidBannerProd = 'ca-app-pub-6352577985769083/7886470703';
   static const _androidInterstitialProd = 'ca-app-pub-6352577985769083/8312856434';
   static const _androidNativeProd = 'ca-app-pub-6352577985769083/9710342782';
-  static const _iosBannerProd = ''; // TODO: create iOS app + units
-  static const _iosInterstitialProd = '';
-  static const _iosNativeProd = '';
+  // iOS
+  static const _iosBannerProd = 'ca-app-pub-6352577985769083/2715012417';
+  static const _iosInterstitialProd =
+      'ca-app-pub-6352577985769083/1457650921';
+  static const _iosNativeProd = 'ca-app-pub-6352577985769083/5587899409';
 
   // ── Google test unit IDs (used in debug builds, or until prod IDs exist) ────
   static const _androidBannerTest = 'ca-app-pub-3940256099942544/6300978111';
