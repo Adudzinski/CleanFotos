@@ -28,13 +28,21 @@ workflows:
       # It's optional — without it the build number falls back to pubspec.
       groups:
         - appstore
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.crocodata.cleanpics
 
     scripts:
-      - name: Set up code signing settings on Xcode project
-        script: xcode-project use-profiles
+      - name: Set up code signing (fetch + create if missing)
+        script: |
+          # Register the bundle ID, create a distribution certificate and an
+          # App Store provisioning profile if they don't exist yet, then wire
+          # them into the Xcode project. Requires the App Store Connect API key
+          # (from the integration above) to have ADMIN access so it can create
+          # the certificate/profile on the first run.
+          keychain initialize
+          app-store-connect fetch-signing-files "com.crocodata.cleanpics" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
 
       - name: Get Flutter packages
         script: flutter pub get
@@ -81,9 +89,16 @@ workflows:
 
       app_store_connect:
         auth: integration
-        # Upload to TestFlight. Turn on App Store submission only after
-        # screenshots, privacy answers, and IAP are ready in App Store Connect.
+        # Upload the build to TestFlight (processes for internal testers with
+        # no review needed).
         submit_to_testflight: true
+        # To also push it to EXTERNAL testers — which triggers Apple's Beta App
+        # Review — uncomment and set your external group name exactly as it
+        # appears in App Store Connect → TestFlight → your app.
+        # beta_groups:
+        #   - External Testers
+        # Turn on full App Store submission only after screenshots, privacy
+        # answers, and the IAP are ready in App Store Connect.
         # submit_to_app_store: true
 
   # Optional: compile-only check (no Apple credentials required).

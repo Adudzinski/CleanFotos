@@ -56,5 +56,9 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- App uses only standard HTTPS encryption (exempt). Setting this to
+		     false lets TestFlight builds skip the export-compliance question. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 	</dict>
 </plist>
