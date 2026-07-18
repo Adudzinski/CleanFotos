@@ -14,10 +14,11 @@ workflows:
     max_build_duration: 120
     instance_type: mac_mini_m2
 
-    # Must match the key name you save in Codemagic:
-    # Team integrations → Developer Portal → Manage keys
+    # Reuse the SAME App Store Connect API key as Askra — it's account-wide and
+    # works for every app on the account. Name must match Codemagic exactly:
+    # Team → Integrations → App Store Connect.
     integrations:
-      app_store_connect: CleanPics
+      app_store_connect: askra-asc-key
 
     environment:
       flutter: stable
@@ -28,21 +29,15 @@ workflows:
       # It's optional — without it the build number falls back to pubspec.
       groups:
         - appstore
+      # Automatic signing — Codemagic creates/manages the certificate and
+      # provisioning profile via the API key above (App Manager role is enough).
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.crocodata.cleanpics
 
     scripts:
-      - name: Set up code signing (fetch + create if missing)
-        script: |
-          # Register the bundle ID, create a distribution certificate and an
-          # App Store provisioning profile if they don't exist yet, then wire
-          # them into the Xcode project. Requires the App Store Connect API key
-          # (from the integration above) to have ADMIN access so it can create
-          # the certificate/profile on the first run.
-          keychain initialize
-          app-store-connect fetch-signing-files "com.crocodata.cleanpics" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-          xcode-project use-profiles
+      - name: Apply signing profiles to Xcode project
+        script: xcode-project use-profiles
 
       - name: Get Flutter packages
         script: flutter pub get
