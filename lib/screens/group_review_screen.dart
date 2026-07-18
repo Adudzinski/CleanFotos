@@ -301,28 +301,33 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              // Continue / Skip
+              // Continue / Next
               Expanded(
+                flex: 3,
                 child: ElevatedButton.icon(
                   onPressed: _advanceGroup,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     minimumSize: const Size.fromHeight(56),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     textStyle: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 22),
-                  label: Text(s.continueBtn),
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(s.continueBtn, maxLines: 1),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               // Delete
               Expanded(
-                flex: 2,
+                flex: 4,
                 child: ElevatedButton.icon(
                   onPressed: hasSelection ? _deleteSelected : null,
                   style: ElevatedButton.styleFrom(
@@ -331,16 +336,21 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                     disabledBackgroundColor: AppTheme.danger.withOpacity(0.4),
                     disabledForegroundColor: Colors.white70,
                     minimumSize: const Size.fromHeight(56),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     textStyle: const TextStyle(
                         fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-                  icon: const Icon(Icons.delete_outline, size: 22),
-                  label: Text(hasSelection
-                      ? s.deleteCount(selectedCount)
-                      : s.deleteBtn),
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      hasSelection ? s.deleteCount(selectedCount) : s.deleteBtn,
+                      maxLines: 1,
+                    ),
+                  ),
                 ),
               ),
             ],
