@@ -17,6 +17,8 @@ class AppStrings {
         return const _PortugueseStrings();
       case 'it':
         return const _ItalianStrings();
+      case 'pl':
+        return const _PolishStrings();
       default:
         return const _EnglishStrings();
     }
@@ -36,7 +38,7 @@ class AppStrings {
   String get coachDone => 'Got it';
   String get groupMode => 'Group Review';
   String get groupModeDesc =>
-      'Review photos taken within 3 minutes of each other. Single photos are in Picture Swipe.';
+      'Photos taken within 3 minutes of each other.';
   String get swipeMode => 'Picture Swipe';
   String get swipeModeDesc =>
       'Swipe left to delete, right to keep.';
@@ -125,6 +127,8 @@ class AppStrings {
   String get proDesc => 'Remove all ads forever with a one-time purchase.';
   String proButton(String price) => 'Remove Ads · $price';
   String get proButtonNoPrice => 'Remove Ads';
+  String get proUnavailable =>
+      'The purchase isn\'t available right now. Please try again later.';
   String get restorePurchase => 'Restore Purchase';
   String get proUnlocked => 'Pro unlocked — thank you! 🎉';
   String get enableAds => 'Show Ads';
@@ -169,7 +173,7 @@ class _SpanishStrings extends AppStrings {
   @override String get coachNext => 'Siguiente';
   @override String get coachDone => 'Entendido';
   @override String get groupMode => 'Revisar grupos';
-  @override String get groupModeDesc => 'Ve 4 fotos similares a la vez y toca para borrar.';
+  @override String get groupModeDesc => 'Fotos tomadas con 3 minutos de diferencia.';
   @override String get swipeMode => 'Deslizar fotos';
   @override String get swipeModeDesc => 'Desliza izquierda para borrar, derecha para conservar.';
   @override String get videoMode => 'Deslizar videos';
@@ -232,6 +236,7 @@ class _SpanishStrings extends AppStrings {
   @override String get proDesc => 'Elimina todos los anuncios para siempre con una compra única.';
   @override String proButton(String price) => 'Quitar anuncios · $price';
   @override String get proButtonNoPrice => 'Quitar anuncios';
+  @override String get proUnavailable => 'La compra no está disponible ahora mismo. Inténtalo más tarde.';
   @override String get restorePurchase => 'Restaurar compra';
   @override String get proUnlocked => 'Pro activado — ¡gracias! 🎉';
   @override String get enableAds => 'Mostrar anuncios';
@@ -265,7 +270,7 @@ class _GermanStrings extends AppStrings {
   @override String get coachNext => 'Weiter';
   @override String get coachDone => 'Verstanden';
   @override String get groupMode => 'Gruppen ansehen';
-  @override String get groupModeDesc => '4 ähnliche Fotos gleichzeitig anzeigen und zum Löschen tippen.';
+  @override String get groupModeDesc => 'Fotos, die innerhalb von 3 Minuten entstanden sind.';
   @override String get swipeMode => 'Bilder wischen';
   @override String get swipeModeDesc => 'Links wischen zum Löschen, rechts zum Behalten.';
   @override String get videoMode => 'Videos wischen';
@@ -328,6 +333,7 @@ class _GermanStrings extends AppStrings {
   @override String get proDesc => 'Entferne alle Werbung dauerhaft mit einem einmaligen Kauf.';
   @override String proButton(String price) => 'Werbung entfernen · $price';
   @override String get proButtonNoPrice => 'Werbung entfernen';
+  @override String get proUnavailable => 'Der Kauf ist derzeit nicht verfügbar. Bitte versuche es später erneut.';
   @override String get restorePurchase => 'Kauf wiederherstellen';
   @override String get proUnlocked => 'Pro freigeschaltet — danke! 🎉';
   @override String get enableAds => 'Werbung anzeigen';
@@ -361,7 +367,7 @@ class _FrenchStrings extends AppStrings {
   @override String get coachNext => 'Suivant';
   @override String get coachDone => 'Compris';
   @override String get groupMode => 'Révision par groupe';
-  @override String get groupModeDesc => 'Voir 4 photos similaires et appuyer pour supprimer.';
+  @override String get groupModeDesc => 'Photos prises à moins de 3 minutes.';
   @override String get swipeMode => 'Balayer les photos';
   @override String get swipeModeDesc => 'Balayez à gauche pour supprimer, à droite pour garder.';
   @override String get videoMode => 'Balayer les vidéos';
@@ -424,6 +430,7 @@ class _FrenchStrings extends AppStrings {
   @override String get proDesc => 'Supprimez toutes les pubs pour toujours avec un achat unique.';
   @override String proButton(String price) => 'Supprimer les pubs · $price';
   @override String get proButtonNoPrice => 'Supprimer les pubs';
+  @override String get proUnavailable => 'L\'achat n\'est pas disponible pour le moment. Réessayez plus tard.';
   @override String get restorePurchase => 'Restaurer l\'achat';
   @override String get proUnlocked => 'Pro activé — merci ! 🎉';
   @override String get enableAds => 'Afficher les publicités';
@@ -457,7 +464,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get coachNext => 'Próximo';
   @override String get coachDone => 'Entendi';
   @override String get groupMode => 'Revisão em grupo';
-  @override String get groupModeDesc => 'Veja 4 fotos similares e toque para deletar.';
+  @override String get groupModeDesc => 'Fotos tiradas com até 3 minutos de diferença.';
   @override String get swipeMode => 'Deslizar fotos';
   @override String get swipeModeDesc => 'Deslize para esquerda para deletar, direita para manter.';
   @override String get videoMode => 'Deslizar vídeos';
@@ -520,6 +527,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get proDesc => 'Remova todos os anúncios para sempre com uma compra única.';
   @override String proButton(String price) => 'Remover anúncios · $price';
   @override String get proButtonNoPrice => 'Remover anúncios';
+  @override String get proUnavailable => 'A compra não está disponível no momento. Tente novamente mais tarde.';
   @override String get restorePurchase => 'Restaurar compra';
   @override String get proUnlocked => 'Pro ativado — obrigado! 🎉';
   @override String get enableAds => 'Mostrar anúncios';
@@ -553,7 +561,7 @@ class _ItalianStrings extends AppStrings {
   @override String get coachNext => 'Avanti';
   @override String get coachDone => 'Capito';
   @override String get groupMode => 'Revisione per gruppo';
-  @override String get groupModeDesc => 'Vedi 4 foto simili e tocca per eliminare.';
+  @override String get groupModeDesc => 'Foto scattate a meno di 3 minuti di distanza.';
   @override String get swipeMode => 'Scorri foto';
   @override String get swipeModeDesc => 'Scorri a sinistra per eliminare, a destra per tenere.';
   @override String get videoMode => 'Scorri video';
@@ -616,6 +624,7 @@ class _ItalianStrings extends AppStrings {
   @override String get proDesc => 'Rimuovi tutta la pubblicità per sempre con un acquisto unico.';
   @override String proButton(String price) => 'Rimuovi pubblicità · $price';
   @override String get proButtonNoPrice => 'Rimuovi pubblicità';
+  @override String get proUnavailable => 'L\'acquisto non è disponibile al momento. Riprova più tardi.';
   @override String get restorePurchase => 'Ripristina acquisto';
   @override String get proUnlocked => 'Pro attivato — grazie! 🎉';
   @override String get enableAds => 'Mostra pubblicità';
@@ -633,4 +642,102 @@ class _ItalianStrings extends AppStrings {
   @override String get buildWith => 'Creato con';
   @override String get developerTip => 'Consiglio';
   @override String get developerTipValue => 'Pubblica su App Store e Play Store';
+}
+
+// ─── Polish ─────────────────────────────────────────────────────────────────
+class _PolishStrings extends AppStrings {
+  const _PolishStrings() : super._('pl');
+
+  @override String get welcomeTitle => 'Uporządkuj swoje zdjęcia';
+  @override String get welcomeSubtitle =>
+      'CleanFotos znajduje duplikaty i podobne zdjęcia i pomaga szybko je usunąć.';
+  @override String get startAnalysis => 'Analizuj moje zdjęcia';
+  @override String get analyzingPhotos => 'Analizowanie zdjęć…';
+  @override String get refresh => 'Odśwież';
+  @override String get allClean => 'Wszystko czyste! 🎉';
+  @override String get coachNext => 'Dalej';
+  @override String get coachDone => 'Rozumiem';
+  @override String get groupMode => 'Przegląd grup';
+  @override String get groupModeDesc => 'Zdjęcia zrobione w odstępie 3 minut.';
+  @override String get swipeMode => 'Przesuwanie zdjęć';
+  @override String get swipeModeDesc => 'Przesuń w lewo, aby usunąć, w prawo, aby zachować.';
+  @override String get videoMode => 'Przesuwanie wideo';
+  @override String get videoModeDesc => 'Przesuń w lewo, aby usunąć, w prawo, aby zachować, przytrzymaj, aby podejrzeć.';
+  @override String get swipeAnyToContinue => 'Przesuń w dowolną stronę, aby kontynuować';
+  @override String get totalPhotos => 'Wszystkie zdjęcia';
+  @override String get similarGroups => 'Podobne grupy';
+  @override String get librarySize => 'Rozmiar biblioteki';
+  @override String get couldSave => 'Do zaoszczędzenia';
+  @override String get freedSpace => 'Zwolnione miejsce';
+  @override String get deletedPhotos => 'Usunięte zdjęcia';
+  @override String groupOf(int c, int t) => 'Grupa $c z $t';
+  @override String photosInGroup(int n) => '$n zdjęć';
+  @override String get tapToSelectDelete => 'Dotknij zdjęcia, aby oznaczyć do usunięcia';
+  @override String get tapToDeselect => 'Dotknij ponownie, aby odznaczyć';
+  @override String get continueBtn => 'Dalej';
+  @override String get deleteBtn => 'Usuń';
+  @override String deleteCount(int n) => 'Usuń ($n)';
+  @override String get remaining => 'pozostało';
+  @override String get swipeHint => '← W lewo: usuń  ·  W prawo: zachowaj →';
+  @override String get swipeDelete => 'Usuń';
+  @override String get swipeKeep => 'Zachowaj';
+  @override String get swipeDone => 'Gotowe!';
+  @override String get deleted_noun => 'usunięto';
+  @override String get backHome => 'Powrót do ekranu głównego';
+  @override String get recoverHint => 'Usunięte zdjęcia pozostają w folderze „Ostatnio usunięte" telefonu przez ~30 dni.';
+  @override String get sponsored => 'Sponsorowane';
+  @override String get adSwipeHint => 'Przesuń w dowolną stronę, aby kontynuować';
+  @override String deleted(int n, String size) => '$n zdjęć usunięto · zwolniono $size!';
+  @override String get permissionTitle => 'Wymagany dostęp do zdjęć';
+  @override String get permissionBody => 'CleanFotos potrzebuje dostępu do Twoich zdjęć, aby znaleźć duplikaty. Przyznaj uprawnienia w Ustawieniach.';
+  @override String get openSettings => 'Otwórz ustawienia';
+  @override String get videoAccessTitle => 'Zezwól na dostęp do wideo';
+  @override String get videoAccessBody => 'Aby uporządkować filmy, CleanFotos potrzebuje dostępu do wszystkich filmów. Otwórz Ustawienia i ustaw „Zdjęcia i wideo" na Zezwól na wszystkie.';
+  @override String get limitedAccessTitle => 'Nie wszystkie zdjęcia są widoczne';
+  @override String get limitedAccessBody => 'CleanFotos widzi tylko wybrane przez Ciebie zdjęcia. Otwórz Ustawienia i ustaw „Zdjęcia i wideo" na Zezwól na wszystkie.';
+  @override String get notNow => 'Nie teraz';
+  @override String get errorMessage => 'Coś poszło nie tak';
+  @override String get deleteFailed => 'Nie usunięto zdjęć. Sprawdź, czy CleanFotos ma pełny dostęp do zdjęć w Ustawieniach.';
+  @override String get retry => 'Spróbuj ponownie';
+  @override String get settings => 'Ustawienia';
+  @override String get cleanappsPromoTitle => 'Wypróbuj CleanApps';
+  @override String get cleanappsPromoSubtitle => 'Przesuwaj, aby usunąć nieużywane aplikacje i zwolnić jeszcze więcej miejsca.';
+  @override String get cleanappsPromoCta => 'Pobierz';
+  @override String get statistics => 'Statystyki';
+  @override String get language => 'Język';
+  @override String get theme => 'Motyw';
+  @override String get themeSystem => 'Systemowy';
+  @override String get themeLight => 'Jasny';
+  @override String get themeDark => 'Ciemny';
+  @override String get reminders => 'Przypomnienia';
+  @override String get monthlyReminder => 'Przypomnienie o porządkach';
+  @override String get monthlyReminderDesc => 'Otrzymuj przypomnienie, aby uporządkować zdjęcia.';
+  @override String get reminderTitle => 'Czas na porządki! 📸';
+  @override String get reminderBody => 'Zwolnij miejsce — przejrzyj podobne zdjęcia w CleanFotos.';
+  @override String get monetization => 'Monetyzacja';
+  @override String saveUpTo(String size) => 'Zaoszczędź ~$size';
+  @override String get removeAds => 'Usuń reklamy';
+  @override String get homeProCta => 'Usuń reklamy dzięki CleanFotos Pro';
+  @override String get proTitle => 'CleanFotos Pro';
+  @override String get proDesc => 'Usuń wszystkie reklamy na zawsze jednym zakupem.';
+  @override String proButton(String price) => 'Usuń reklamy · $price';
+  @override String get proButtonNoPrice => 'Usuń reklamy';
+  @override String get proUnavailable => 'Zakup jest teraz niedostępny. Spróbuj ponownie później.';
+  @override String get restorePurchase => 'Przywróć zakup';
+  @override String get proUnlocked => 'Pro odblokowane — dziękujemy! 🎉';
+  @override String get enableAds => 'Pokaż reklamy';
+  @override String get adsDesc => 'Reklamy pozwalają, aby CleanFotos był darmowy. Dziękujemy za wsparcie!';
+  @override String get monetizationTips => 'Sposoby monetyzacji';
+  @override String get tip1 => 'Reklamy banerowe i pełnoekranowe przez Google AdMob.';
+  @override String get tip2 => 'Jednorazowy zakup „Pro" usuwa reklamy.';
+  @override String get tip3 => 'Subskrypcja z inteligentną synchronizacją w chmurze.';
+  @override String get tip4 => 'ASO + pozytywne oceny = więcej pobrań.';
+  @override String get about => 'O aplikacji';
+  @override String get privacyPolicy => 'Polityka prywatności';
+  @override String get rateApp => 'Oceń CleanFotos';
+  @override String get privacyOptions => 'Opcje prywatności reklam';
+  @override String get appVersion => 'Wersja';
+  @override String get buildWith => 'Stworzono z';
+  @override String get developerTip => 'Wskazówka';
+  @override String get developerTipValue => 'Opublikuj w App Store i Play Store';
 }

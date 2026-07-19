@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
@@ -94,7 +95,13 @@ class _SwipeScreenState extends State<SwipeScreen>
     );
     _promote.value = 1.0; // first card starts at full size
 
-    if (_provider.adsEnabled) _loadNativeAd();
+    if (_provider.adsEnabled) _maybeLoadNativeAd();
+  }
+
+  Future<void> _maybeLoadNativeAd() async {
+    await AdService.instance.init();
+    if (!mounted || !AdService.instance.canRequestAds) return;
+    _loadNativeAd();
   }
 
   void _playPromoteAnimation() => _promote.forward(from: 0);
@@ -113,8 +120,9 @@ class _SwipeScreenState extends State<SwipeScreen>
   /// Pre-load a native ad so a filled ad card is ready when its slot comes up.
   void _loadNativeAd() {
     if (!AdService.instance.canRequestAds) return;
+    final unitId = AdService.nativeUnitId;
     final ad = NativeAd(
-      adUnitId: AdService.nativeUnitId,
+      adUnitId: unitId,
       request: const AdRequest(),
       nativeTemplateStyle: NativeTemplateStyle(
         templateType: TemplateType.medium,
@@ -141,9 +149,11 @@ class _SwipeScreenState extends State<SwipeScreen>
       ),
       listener: NativeAdListener(
         onAdLoaded: (_) {
+          debugPrint('[Ads] native loaded ($unitId)');
           if (mounted) setState(() => _nativeAdLoaded = true);
         },
-        onAdFailedToLoad: (ad, _) {
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('[Ads] native failed ($unitId): $error');
           ad.dispose();
           _nativeAd = null;
           _nativeAdLoaded = false;

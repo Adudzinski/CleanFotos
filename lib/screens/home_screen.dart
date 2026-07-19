@@ -629,16 +629,35 @@ class _HomeScreenState extends State<HomeScreen>
       subtitle: s.proTitle,
       gradient: const [Color(0xFFFFA33F), Color(0xFFF57C00)],
       enabled: true,
-      onTap: () {
+      onTap: () async {
         final purchase = PurchaseService.instance;
+        // Straight to the store purchase sheet.
         if (purchase.isAvailable) {
-          purchase.buyPro();
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const SettingsScreen()),
-          );
+          await purchase.buyPro();
+          return;
         }
+        // The product may not have loaded at startup (store propagation delay,
+        // agreements not active yet). Give it one more try before giving up.
+        final ready = await purchase.refreshProduct();
+        if (!context.mounted) return;
+        if (ready) {
+          await purchase.buyPro();
+          return;
+        }
+        // Still unavailable — say so instead of silently opening Settings,
+        // which looks like a bug. Restore lives in Settings.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(s.proUnavailable),
+            action: SnackBarAction(
+              label: s.settings,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              ),
+            ),
+          ),
+        );
       },
     );
   }
@@ -725,11 +744,16 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             Icon(icon, color: color, size: 24),
             const SizedBox(height: 8),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textPrimary)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value,
+                  maxLines: 1,
+                  style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textPrimary)),
+            ),
             const SizedBox(height: 4),
             Text(label,
                 style: TextStyle(

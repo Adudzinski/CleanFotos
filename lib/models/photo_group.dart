@@ -95,8 +95,10 @@ class LibraryStats {
     if (bytes < 1024) return '${bytes} B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
     }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+    // Whole-number GB (e.g. "90 GB", not "90.24 GB") — cleaner and keeps the
+    // home stat card on one line so both cards stay the same size.
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(0)} GB';
   }
 }

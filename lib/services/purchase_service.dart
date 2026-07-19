@@ -56,6 +56,25 @@ class PurchaseService {
     });
   }
 
+  /// Re-query the store for the product.
+  ///
+  /// [init] runs once at startup; if the product wasn't configured or hadn't
+  /// propagated yet, the buy button would stay dead until an app restart.
+  /// Calling this on tap gives it a second chance. Returns [isAvailable].
+  Future<bool> refreshProduct() async {
+    try {
+      _available = await _iap.isAvailable();
+      if (!_available) return false;
+      final resp = await _iap.queryProductDetails({proProductId});
+      if (resp.productDetails.isNotEmpty) {
+        _proProduct = resp.productDetails.first;
+      }
+    } catch (_) {
+      // Leave previous state untouched on a transient store error.
+    }
+    return isAvailable;
+  }
+
   /// Start the buy flow. No-op if the product isn't available.
   Future<void> buyPro() async {
     final product = _proProduct;

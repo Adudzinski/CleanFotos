@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -59,26 +60,34 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
   void initState() {
     super.initState();
     _provider = context.read<AppProvider>();
-
-    // Build the deck: video, video, video, video, [ad], video, ...
-    // Only interleave ads for non-Pro users when ads may be served.
-    final showAds = !_provider.isPro && AdService.instance.canRequestAds;
-    _deck = [];
-    int since = 0;
-    for (final v in widget.videos) {
-      _deck.add(_DeckItem.video(v));
-      since++;
-      if (showAds && since == _adEvery) {
-        _deck.add(const _DeckItem.ad());
-        since = 0;
-      }
-    }
+    _deck = [for (final v in widget.videos) _DeckItem.video(v)];
     _restoreThenPrepare();
   }
 
   Future<void> _restoreThenPrepare() async {
+    // Wait for UMP consent before deciding whether to interleave native ads.
+    if (!_provider.isPro) {
+      await AdService.instance.init();
+      if (mounted && AdService.instance.canRequestAds) {
+        _deck = _buildDeckWithAds(widget.videos);
+      }
+    }
     _prepareCurrent();
     if (mounted) setState(() {});
+  }
+
+  List<_DeckItem> _buildDeckWithAds(List<AssetEntity> videos) {
+    final deck = <_DeckItem>[];
+    var since = 0;
+    for (final v in videos) {
+      deck.add(_DeckItem.video(v));
+      since++;
+      if (since == _adEvery) {
+        deck.add(const _DeckItem.ad());
+        since = 0;
+      }
+    }
+    return deck;
   }
 
   @override
@@ -127,8 +136,9 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
 
   void _loadAd() {
     if (!AdService.instance.canRequestAds) return;
+    final unitId = AdService.nativeUnitId;
     final ad = NativeAd(
-      adUnitId: AdService.nativeUnitId,
+      adUnitId: unitId,
       request: const AdRequest(),
       nativeTemplateStyle: NativeTemplateStyle(
         templateType: TemplateType.medium,
@@ -137,9 +147,11 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
       ),
       listener: NativeAdListener(
         onAdLoaded: (_) {
+          debugPrint('[Ads] video-native loaded ($unitId)');
           if (mounted) setState(() => _adReady = true);
         },
-        onAdFailedToLoad: (ad, _) {
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('[Ads] video-native failed ($unitId): $error');
           ad.dispose();
           if (mounted) setState(() => _adReady = false);
         },

@@ -11,7 +11,7 @@ import '../services/photo_service.dart';
 import '../services/purchase_service.dart';
 import '../utils/asset_utils.dart';
 
-const Set<String> kSupportedLanguages = {'en', 'es', 'de', 'fr', 'pt', 'it'};
+const Set<String> kSupportedLanguages = {'en', 'es', 'de', 'fr', 'pt', 'it', 'pl'};
 
 enum AppState { initial, loading, ready, permissionDenied, error }
 

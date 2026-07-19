@@ -1,14 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-/// Thin wrapper around Google Mobile Ads.
-///
-/// Uses Google's official **test** ad unit IDs. Before publishing, replace
-/// [_androidBanner]/[_iosBanner]/[_androidInterstitial]/[_iosInterstitial] with
-/// your real unit IDs from the AdMob console, and replace the App IDs in
-/// AndroidManifest.xml and ios/Runner/Info.plist.
+/// Thin wrapper around Google Mobile Ads + UMP consent.
 class AdService {
   AdService._();
   static final AdService instance = AdService._();
@@ -27,8 +22,12 @@ class AdService {
   bool _privacyOptionsRequired = false;
   bool get isPrivacyOptionsRequired => _privacyOptionsRequired;
 
-  /// Completes once consent has been resolved and the SDK initialized. Widgets
-  /// (e.g. the banner) await this before trying to load an ad.
+  /// Bumps whenever consent / ad-readiness changes so UI (banner) can reload.
+  final StreamController<void> _adsReadyChanges =
+      StreamController<void>.broadcast();
+  Stream<void> get onAdsReadyChanged => _adsReadyChanges.stream;
+
+  /// Completes once consent has been resolved and the SDK initialized.
   Future<void> get ready => _initFuture ?? Future<void>.value();
 
   // Frequency cap: show an interstitial at most once per this interval.
@@ -36,7 +35,6 @@ class AdService {
   DateTime? _lastInterstitial;
 
   // ── Real (production) unit IDs from the AdMob console ───────────────────────
-  // Leave a value empty until that unit is created → it falls back to a test ID.
   // Android — do not change; shared codebase with iOS.
   static const _androidBannerProd = 'ca-app-pub-6352577985769083/7886470703';
   static const _androidInterstitialProd = 'ca-app-pub-6352577985769083/8312856434';
@@ -47,7 +45,7 @@ class AdService {
       'ca-app-pub-6352577985769083/1457650921';
   static const _iosNativeProd = 'ca-app-pub-6352577985769083/5587899409';
 
-  // ── Google test unit IDs (used in debug builds, or until prod IDs exist) ────
+  // ── Google test unit IDs (used in debug builds) ─────────────────────────────
   static const _androidBannerTest = 'ca-app-pub-3940256099942544/6300978111';
   static const _iosBannerTest = 'ca-app-pub-3940256099942544/2934735716';
   static const _androidInterstitialTest = 'ca-app-pub-3940256099942544/1033173712';
@@ -79,43 +77,47 @@ class AdService {
   Future<void> _init() async {
     await _gatherConsent();
     await MobileAds.instance.initialize();
-    // Note: we intentionally do NOT seed _lastInterstitial here, so the first
-    // completed cleanup can show an interstitial. The cooldown then spaces out
-    // every subsequent one.
-    if (_canRequestAds) _loadInterstitial();
+    debugPrint(
+      '[Ads] init done — canRequestAds=$_canRequestAds '
+      'privacyOptions=$_privacyOptionsRequired '
+      'banner=$bannerUnitId debug=$kDebugMode',
+    );
+    if (_canRequestAds) {
+      _loadInterstitial();
+    } else {
+      debugPrint(
+        '[Ads] No ads until consent allows it. '
+        'AdMob → Privacy & messaging → publish GDPR for the iOS CleanFotos app, '
+        'then accept the in-app consent form (or Settings → Ad privacy options).',
+      );
+    }
+    if (!_adsReadyChanges.isClosed) _adsReadyChanges.add(null);
   }
 
-  /// Run Google's User Messaging Platform flow: request the latest consent
-  /// info, and if a form is required (EEA/UK), load and show it. Outside the
-  /// EEA this is a no-op and [canRequestAds] simply becomes true.
   Future<void> _gatherConsent() async {
-    final params = ConsentRequestParameters(
-      // In debug you can force the EEA experience to test the form by adding
-      // your device's test id below (printed in logcat on first run):
-      //   consentDebugSettings: ConsentDebugSettings(
-      //     debugGeography: DebugGeography.debugGeographyEea,
-      //     testIdentifiers: ['YOUR_TEST_DEVICE_ID'],
-      //   ),
-    );
+    final params = ConsentRequestParameters();
 
     final completer = Completer<void>();
     ConsentInformation.instance.requestConsentInfoUpdate(
       params,
       () {
-        // Shows the form only if required; fires the callback immediately if
-        // not. Either way we then know whether ads can be requested.
         ConsentForm.loadAndShowConsentFormIfRequired((FormError? error) {
+          if (error != null) {
+            debugPrint('[Ads] consent form error: ${error.message}');
+          }
           if (!completer.isCompleted) completer.complete();
         });
       },
       (FormError error) {
+        debugPrint('[Ads] consent info update failed: ${error.message}');
         if (!completer.isCompleted) completer.complete();
       },
     );
 
-    // Never block app start indefinitely on a slow network.
     await completer.future
-        .timeout(const Duration(seconds: 12), onTimeout: () {});
+        .timeout(const Duration(seconds: 12), onTimeout: () {
+      debugPrint('[Ads] consent timed out after 12s');
+    });
 
     try {
       _canRequestAds = await ConsentInformation.instance.canRequestAds();
@@ -123,24 +125,35 @@ class AdService {
           await ConsentInformation.instance.getPrivacyOptionsRequirementStatus();
       _privacyOptionsRequired =
           status == PrivacyOptionsRequirementStatus.required;
-    } catch (_) {
-      // If the consent check fails, fall back to requesting (non-personalized)
-      // ads so the app still earns outside regulated regions.
+      final consentStatus =
+          await ConsentInformation.instance.getConsentStatus();
+      debugPrint(
+        '[Ads] consentStatus=$consentStatus '
+        'canRequestAds=$_canRequestAds '
+        'privacyOptionsRequired=$_privacyOptionsRequired',
+      );
+    } catch (e) {
+      debugPrint('[Ads] consent check failed ($e) — allowing non-personalized ads');
       _canRequestAds = true;
     }
   }
 
-  /// Re-open the consent form so the user can change their choices. Call this
-  /// from a "Privacy options" entry in Settings (only when
-  /// [isPrivacyOptionsRequired] is true).
+  /// Re-open the consent form so the user can change their choices.
   Future<void> showPrivacyOptionsForm() async {
     final completer = Completer<void>();
     ConsentForm.showPrivacyOptionsForm((FormError? error) {
+      if (error != null) {
+        debugPrint('[Ads] privacy options error: ${error.message}');
+      }
       if (!completer.isCompleted) completer.complete();
     });
     await completer.future;
     try {
+      final before = _canRequestAds;
       _canRequestAds = await ConsentInformation.instance.canRequestAds();
+      debugPrint('[Ads] after privacy options canRequestAds=$_canRequestAds');
+      if (_canRequestAds && !before) _loadInterstitial();
+      if (!_adsReadyChanges.isClosed) _adsReadyChanges.add(null);
     } catch (_) {}
   }
 
@@ -149,14 +162,19 @@ class AdService {
       adUnitId: interstitialUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) => _interstitial = ad,
-        onAdFailedToLoad: (_) => _interstitial = null,
+        onAdLoaded: (ad) {
+          debugPrint('[Ads] interstitial loaded');
+          _interstitial = ad;
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('[Ads] interstitial failed: $error');
+          _interstitial = null;
+        },
       ),
     );
   }
 
-  /// Show a full-screen ad if one is ready AND the cooldown has elapsed, then
-  /// pre-load the next. Returns true if an ad was actually shown.
+  /// Show a full-screen ad if one is ready AND the cooldown has elapsed.
   bool showInterstitial() {
     if (!_canRequestAds) return false;
     final last = _lastInterstitial;

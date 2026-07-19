@@ -6,7 +6,6 @@ import '../services/ad_service.dart';
 import '../services/purchase_service.dart';
 import '../services/review_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/cleanapps_promo_banner.dart';
 import '../l10n/strings.dart';
 
 const String kPrivacyPolicyUrl =
@@ -25,11 +24,6 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // ── CleanApps cross-promo ─────────────────────────────────────────
-          CleanAppsPromoBanner(s: s),
-
-          const SizedBox(height: 24),
-
           // ── Stats Card ────────────────────────────────────────────────────
           _sectionHeader(s.statistics),
           _statsCard(context, provider, s),
@@ -144,6 +138,7 @@ class SettingsScreen extends StatelessWidget {
       {'code': 'fr', 'name': '🇫🇷 Français'},
       {'code': 'pt', 'name': '🇧🇷 Português'},
       {'code': 'it', 'name': '🇮🇹 Italiano'},
+      {'code': 'pl', 'name': '🇵🇱 Polski'},
     ];
 
     return _card(
@@ -304,10 +299,9 @@ class SettingsScreen extends StatelessWidget {
 
   Widget _aboutCard(
       BuildContext context, AppProvider provider, AppStrings s) {
-    // The "Ad privacy options" entry is only meaningful for non-Pro users in
-    // regions (EEA/UK) where Google's consent platform requires it.
-    final showPrivacyOptions =
-        !provider.isPro && AdService.instance.isPrivacyOptionsRequired;
+    // Always offer this for non-Pro users so EEA testers can fix consent even
+    // if UMP hasn't marked privacy-options as "required" yet.
+    final showPrivacyOptions = !provider.isPro;
 
     return _card(
       child: Column(
