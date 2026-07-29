@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 /// Thin wrapper around Google Mobile Ads + UMP consent.
@@ -75,6 +76,7 @@ class AdService {
   Future<void> init() => _initFuture ??= _init();
 
   Future<void> _init() async {
+    await _requestTrackingAuthorization();
     await _gatherConsent();
     await MobileAds.instance.initialize();
     debugPrint(
@@ -92,6 +94,28 @@ class AdService {
       );
     }
     if (!_adsReadyChanges.isClosed) _adsReadyChanges.add(null);
+  }
+
+  /// iOS only: show Apple's App Tracking Transparency prompt before the AdMob
+  /// consent form runs.
+  ///
+  /// Apple requires this because the UMP consent form references cookies and
+  /// personalized advertising (App Review guideline 5.1.2(i)). If the user
+  /// declines, iOS withholds the IDFA and AdMob automatically falls back to
+  /// non-personalized ads — declining is safe, just less lucrative.
+  Future<void> _requestTrackingAuthorization() async {
+    if (!Platform.isIOS) return;
+    try {
+      // Small delay so the prompt isn't suppressed while the app is still
+      // becoming active on a cold start.
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+      if (status == TrackingStatus.notDetermined) {
+        await AppTrackingTransparency.requestTrackingAuthorization();
+      }
+    } catch (_) {
+      // Never block ad init if the ATT prompt fails.
+    }
   }
 
   Future<void> _gatherConsent() async {

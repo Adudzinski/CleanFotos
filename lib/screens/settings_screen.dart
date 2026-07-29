@@ -269,7 +269,24 @@ class SettingsScreen extends StatelessWidget {
                   height: 1.4)),
           const SizedBox(height: 14),
           ElevatedButton.icon(
-            onPressed: purchase.isAvailable ? () => purchase.buyPro() : null,
+            // Never disable this: a dead button looks broken (and App Review
+            // flagged exactly that). If the product hasn't loaded yet we
+            // re-query on tap, then explain if it's still unavailable.
+            onPressed: () async {
+              if (purchase.isAvailable) {
+                await purchase.buyPro();
+                return;
+              }
+              final ready = await purchase.refreshProduct();
+              if (!context.mounted) return;
+              if (ready) {
+                await purchase.buyPro();
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(s.proUnavailable)),
+              );
+            },
             icon: const Icon(Icons.block, size: 20),
             // Google returns the price already localized to the user's currency;
             // show "Remove Ads" (no price) until it loads.
@@ -282,8 +299,9 @@ class SettingsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14)),
             ),
           ),
-          if (purchase.isAvailable)
-            Center(
+          // Always offer Restore — Apple requires a restore path for
+          // non-consumable purchases, and hiding it fails review.
+          Center(
               child: TextButton(
                 onPressed: () => purchase.restore(),
                 child: Text(s.restorePurchase,

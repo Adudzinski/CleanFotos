@@ -47,6 +47,9 @@
 		<string>CleanFotos needs access to your photos to find and remove duplicates, freeing up storage space.</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>CleanFotos needs access to save photos back to your library.</string>
+		<!-- App Tracking Transparency prompt text (shown before ads load) -->
+		<key>NSUserTrackingUsageDescription</key>
+		<string>Allow tracking so we can show ads that are more relevant to you. CleanFotos stays free either way — your photos are never shared.</string>
 		<!-- Google AdMob App ID (iOS) -->
 		<key>GADApplicationIdentifier</key>
 		<string>ca-app-pub-6352577985769083~1186188185</string>

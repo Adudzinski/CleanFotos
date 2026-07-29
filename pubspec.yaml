@@ -29,6 +29,10 @@ dependencies:
   # Ads monetization
   google_mobile_ads: ^9.0.0
 
+  # iOS App Tracking Transparency — required by Apple before the AdMob/UMP
+  # consent flow, which references cookies and personalized ads.
+  app_tracking_transparency: ^2.0.6
+
   # One-time "Pro" in-app purchase (remove ads)
   in_app_purchase: ^3.2.0
 
