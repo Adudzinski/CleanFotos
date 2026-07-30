@@ -27,6 +27,11 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   /// Selected for deletion
   final Set<String> _selectedIds = {};
 
+  /// See note in home_screen: CelebrationOverlay.of() looks up the tree, so
+  /// a GlobalKey is required to reach the overlay this screen builds.
+  final GlobalKey<CelebrationOverlayState> _celebrationKey =
+      GlobalKey<CelebrationOverlayState>();
+
   @override
   void initState() {
     super.initState();
@@ -77,16 +82,24 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       return;
     }
 
-    CelebrationOverlay.of(context)
+    _celebrationKey.currentState
         ?.celebrate(s.deleted(toDelete.length, _formatBytes(freed)));
 
-    // Remove the deleted photos; the rest reflow up. We do NOT auto-advance —
-    // the user stays on this group and taps "Next" when they're done.
+    // Remove the deleted photos; the rest reflow up. We do NOT auto-advance
+    // while photos remain — the user stays on this group and taps "Next".
     setState(() {
       final del = Set<String>.from(_selectedIds);
       _photos.removeWhere((a) => del.contains(a.id));
       _selectedIds.clear();
     });
+
+    // ...but if the whole group is gone there's nothing left to review, so
+    // move straight on to the next group.
+    if (_photos.isEmpty) {
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      if (!mounted) return;
+      _advanceGroup();
+    }
   }
 
   void _advanceGroup() {
@@ -117,6 +130,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     final totalInGroup = group.totalCount;
 
     return CelebrationOverlay(
+      key: _celebrationKey,
       child: Scaffold(
         backgroundColor: AppTheme.background,
         appBar: _buildAppBar(context, s),

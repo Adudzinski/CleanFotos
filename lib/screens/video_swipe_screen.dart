@@ -38,7 +38,12 @@ class VideoSwipeScreen extends StatefulWidget {
 }
 
 class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
-  late final List<_DeckItem> _deck;
+  /// CelebrationOverlay.of() searches ancestors, but the overlay is built
+  /// below this State's context — use a GlobalKey to reach it.
+  final GlobalKey<CelebrationOverlayState> _celebrationKey =
+      GlobalKey<CelebrationOverlayState>();
+
+  List<_DeckItem> _deck = const [];
   late final AppProvider _provider;
   int _current = 0;
 
@@ -65,15 +70,19 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
   }
 
   Future<void> _restoreThenPrepare() async {
-    // Wait for UMP consent before deciding whether to interleave native ads.
-    if (!_provider.isPro) {
-      await AdService.instance.init();
-      if (mounted && AdService.instance.canRequestAds) {
-        _deck = _buildDeckWithAds(widget.videos);
-      }
-    }
+    // Start loading the FIRST video immediately. Previously this waited on
+    // AdService.init() (ATT prompt + UMP consent, up to ~12s), which meant
+    // "hold to play" did nothing on the very first video.
     _prepareCurrent();
     if (mounted) setState(() {});
+
+    // Then resolve consent and, if allowed, interleave native ad cards. Ads
+    // are only ever inserted *after* the first video, so re-building the deck
+    // here never disturbs what's currently on screen.
+    if (_provider.isPro) return;
+    await AdService.instance.init();
+    if (!mounted || !AdService.instance.canRequestAds) return;
+    setState(() => _deck = _buildDeckWithAds(widget.videos));
   }
 
   List<_DeckItem> _buildDeckWithAds(List<AssetEntity> videos) {
@@ -217,7 +226,7 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
       _deletedCount++;
       _freedBytes += kAvgVideoBytes;
       final s = AppStrings.of(_provider.languageCode);
-      CelebrationOverlay.of(context)
+      _celebrationKey.currentState
           ?.celebrate(s.deleted(1, _formatBytes(kAvgVideoBytes)));
     }
     _advance();
@@ -248,6 +257,7 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
         if (!didPop) _exitVideoSwipe();
       },
       child: CelebrationOverlay(
+        key: _celebrationKey,
         child: Scaffold(
           backgroundColor: Colors.black,
           appBar: AppBar(
@@ -491,15 +501,19 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
       color: Colors.black,
       child: Column(
         children: [
-          Text(
-            isAd ? s.swipeAnyToContinue : s.swipeHint,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 14,
-                fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 6),
+          // Swipe instructions removed for videos; ad cards still need the
+          // "swipe either way" hint since they can't be deleted or kept.
+          if (isAd) ...[
+            Text(
+              s.swipeAnyToContinue,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 6),
+          ],
           Text(
             s.recoverHint,
             textAlign: TextAlign.center,

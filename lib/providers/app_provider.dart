@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
@@ -76,14 +77,29 @@ class AppProvider extends ChangeNotifier {
     // Set up in-app purchases; unlock Pro when a purchase/restore completes.
     PurchaseService.instance.init(onPurchased: () => setPro(true));
 
-    // Schedule the seasonal cleanup reminders (always on).
-    _setupReminders();
+    // NOTE: we deliberately do NOT ask for notification permission here.
+    // Stacking it onto first launch (on top of photo access, ATT and the ad
+    // consent form) is a lot of prompts before the user has seen anything.
+    // Reminders are set up after the first successful cleanup instead — see
+    // [maybeSetupReminders].
   }
 
   /// The phone's language if we support it, otherwise English.
   String _deviceLanguage() {
     final code = PlatformDispatcher.instance.locale.languageCode.toLowerCase();
     return kSupportedLanguages.contains(code) ? code : 'en';
+  }
+
+  static const String _kRemindersSetUp = 'reminders_set_up';
+
+  /// Ask for notification permission and schedule the seasonal reminders —
+  /// but only once, and only after the user has actually cleaned something up,
+  /// so the request arrives when the app has demonstrated its value.
+  Future<void> maybeSetupReminders() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_kRemindersSetUp) ?? false) return;
+    await prefs.setBool(_kRemindersSetUp, true);
+    await _setupReminders();
   }
 
   Future<void> _setupReminders() async {
@@ -179,6 +195,11 @@ class AppProvider extends ChangeNotifier {
       stats = _service.estimateStats(_totalPhotos, groups);
       state = AppState.ready;
       notifyListeners();
+
+      // Warm the library up in the background so the first tap on a cleanup
+      // mode doesn't sit on a spinner. Fire-and-forget: the home screen is
+      // already interactive, and ensurePhotos() is cached + idempotent.
+      unawaited(_warmUp());
     } catch (e) {
       state = AppState.error;
       notifyListeners();
@@ -186,6 +207,16 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Load every photo, newest-first — on demand, cached. Used by Picture Swipe.
+  /// Pre-load the photo library (and then the groups) quietly in the
+  /// background after the home screen appears. Failures are ignored — the
+  /// on-demand path still runs if the user taps before this finishes.
+  Future<void> _warmUp() async {
+    try {
+      await ensurePhotos();
+      await ensureGroups();
+    } catch (_) {}
+  }
+
   Future<List<AssetEntity>> ensurePhotos() async {
     if (photosLoaded && allPhotos.isNotEmpty) return allPhotos;
     await PhotoManager.releaseCache();
@@ -209,8 +240,16 @@ class AppProvider extends ChangeNotifier {
     isLoadingGroups = true;
     notifyListeners();
     try {
-      await PhotoManager.releaseCache();
-      final all = await _service.loadAllAssets();
+      // Reuse the already-scanned library if Picture Swipe (or the background
+      // warm-up) loaded it — re-scanning 10k+ assets here was pure waste and
+      // the main reason opening Group Review felt slow.
+      List<AssetEntity> all;
+      if (photosLoaded && allPhotos.isNotEmpty) {
+        all = allPhotos;
+      } else {
+        await PhotoManager.releaseCache();
+        all = await _service.loadAllAssets();
+      }
       _totalPhotos = all.length;
       allPhotos = all;
       photosLoaded = true;
@@ -312,6 +351,10 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('freed_bytes', freedBytes);
     await prefs.setInt('deleted_count', deletedCount);
+
+    // The user has now cleaned something up, so this is a much better moment
+    // to ask about notifications than a cold first launch.
+    unawaited(maybeSetupReminders());
 
     // Remove the actually-deleted assets from the cached lists.
     final deletedSet = deletedIds.toSet();

@@ -25,6 +25,11 @@ class SwipeScreen extends StatefulWidget {
 
 class _SwipeScreenState extends State<SwipeScreen>
     with TickerProviderStateMixin {
+  /// CelebrationOverlay.of() searches ancestors, but the overlay is built
+  /// below this State's context — use a GlobalKey to reach it.
+  final GlobalKey<CelebrationOverlayState> _celebrationKey =
+      GlobalKey<CelebrationOverlayState>();
+
   // Flatten all duplicate assets into one queue, newest first
   late final List<AssetEntity> _queue;
   int _current = 0;
@@ -266,7 +271,7 @@ class _SwipeScreenState extends State<SwipeScreen>
     _freedBytes += kAvgPhotoBytes;
 
     final s = AppStrings.of(_provider.languageCode);
-    CelebrationOverlay.of(context)
+    _celebrationKey.currentState
         ?.celebrate(s.deleted(1, _formatBytes(kAvgPhotoBytes)));
 
     setState(() {
@@ -358,6 +363,7 @@ class _SwipeScreenState extends State<SwipeScreen>
         if (!didPop) _exitSwipe();
       },
       child: CelebrationOverlay(
+        key: _celebrationKey,
         child: Scaffold(
           backgroundColor: Colors.black,
           appBar: AppBar(
@@ -627,15 +633,6 @@ class _SwipeScreenState extends State<SwipeScreen>
       color: Colors.black,
       child: Column(
         children: [
-          Text(
-            s.swipeHint,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 16,
-                fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(height: 6),
           Text(
             s.recoverHint,
             textAlign: TextAlign.center,

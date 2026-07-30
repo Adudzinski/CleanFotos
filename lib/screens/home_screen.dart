@@ -8,6 +8,7 @@ import '../services/purchase_service.dart';
 import '../services/review_service.dart';
 import '../services/video_service.dart';
 import '../widgets/banner_ad_widget.dart';
+import '../widgets/celebration_overlay.dart';
 import '../widgets/coachmark_overlay.dart';
 import 'group_review_screen.dart';
 import 'swipe_screen.dart';
@@ -33,6 +34,12 @@ class _HomeScreenState extends State<HomeScreen>
   final GlobalKey _videoCardKey = GlobalKey();
 
   final VideoService _videoService = VideoService();
+
+  /// Direct handle to the confetti overlay. CelebrationOverlay.of(context)
+  /// searches ANCESTORS, but the overlay is built below this State's context,
+  /// so the lookup always returned null and no celebration ever showed.
+  final GlobalKey<CelebrationOverlayState> _celebrationKey =
+      GlobalKey<CelebrationOverlayState>();
 
   @override
   void initState() {
@@ -108,7 +115,9 @@ class _HomeScreenState extends State<HomeScreen>
 
     final coachSteps = showCoach ? _coachSteps() : const <CoachStep>[];
 
-    return Scaffold(
+    return CelebrationOverlay(
+      key: _celebrationKey,
+      child: Scaffold(
       body: Stack(
         children: [
           SafeArea(
@@ -134,6 +143,7 @@ class _HomeScreenState extends State<HomeScreen>
             ),
         ],
       ),
+    ),
     );
   }
 
@@ -143,19 +153,41 @@ class _HomeScreenState extends State<HomeScreen>
   /// groups live, so re-scanning would just show a loading screen and lose the
   /// user's place. We only show a quick interstitial. (The user can still pull
   /// "Refresh" for a fresh scan.)
-  void _afterMode(AppProvider provider, int deletedBefore) {
+  void _afterMode(AppProvider provider, int deletedBefore,
+      [int freedBefore = 0, BuildContext? ctx]) {
+    // Celebrate what the user just cleaned up, before anything else — this is
+    // the payoff moment for the whole session.
+    final cleaned = provider.deletedCount - deletedBefore;
+    if (cleaned > 0) {
+      final s = AppStrings.of(provider.languageCode);
+      final freed = provider.freedBytes - freedBefore;
+      _celebrationKey.currentState
+          ?.celebrate(s.deleted(cleaned, _formatBytes(freed)));
+    }
+
     // Only interrupt with an interstitial if the user actually cleaned up
     // something in this session (and the 4-min cooldown has elapsed). Exiting
     // a mode without deleting never triggers an ad.
     final didDelete = provider.deletedCount > deletedBefore;
-    final shownAd = didDelete &&
-        provider.adsEnabled &&
-        AdService.instance.showInterstitial();
-    // If no ad appeared, it's a good moment to ask for a rating instead
-    // (so we never stack an ad and a review prompt at once).
-    if (!shownAd) {
-      ReviewService.instance.maybeAsk(provider.deletedCount);
+    // Let the celebration play out before an ad can cover it.
+    Future<void>.delayed(Duration(milliseconds: cleaned > 0 ? 2600 : 0), () {
+      final shownAd = didDelete &&
+          provider.adsEnabled &&
+          AdService.instance.showInterstitial();
+      // If no ad appeared, it's a good moment to ask for a rating instead
+      // (so we never stack an ad and a review prompt at once).
+      if (!shownAd) {
+        ReviewService.instance.maybeAsk(provider.deletedCount);
+      }
+    });
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
     }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   /// Open a cleanup mode, loading data on demand behind a brief loading dialog.
@@ -168,6 +200,7 @@ class _HomeScreenState extends State<HomeScreen>
     required bool swipe,
   }) async {
     final deletedBefore = provider.deletedCount;
+    final freedBefore = provider.freedBytes;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -188,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen>
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => SwipeScreen(photos: photos)),
-      ).then((_) => _afterMode(provider, deletedBefore));
+      ).then((_) => _afterMode(provider, deletedBefore, freedBefore, context));
     } else {
       final groups = await provider.ensureGroups();
       if (!context.mounted) return;
@@ -201,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen>
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => GroupReviewScreen(groups: groups)),
-      ).then((_) => _afterMode(provider, deletedBefore));
+      ).then((_) => _afterMode(provider, deletedBefore, freedBefore, context));
     }
   }
 
@@ -209,6 +242,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _openVideoMode(
       BuildContext context, AppProvider provider, AppStrings s) async {
     final deletedBefore = provider.deletedCount;
+    final freedBefore = provider.freedBytes;
     final access = await _videoService.ensureAccess();
     if (!context.mounted) return;
 
@@ -240,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => VideoSwipeScreen(videos: videos)),
-    ).then((_) => _afterMode(provider, deletedBefore));
+    ).then((_) => _afterMode(provider, deletedBefore, freedBefore, context));
   }
 
   /// Explains that full video access is needed and offers to open Settings.
