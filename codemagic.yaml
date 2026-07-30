@@ -84,9 +84,14 @@ workflows:
 
       app_store_connect:
         auth: integration
-        # Upload the build to TestFlight (processes for internal testers with
-        # no review needed).
-        submit_to_testflight: true
+        # Upload to TestFlight only. Internal testers get the build straight
+        # away with no review.
+        #
+        # submit_to_testflight also submits for EXTERNAL Beta App Review, which
+        # fails with "Another build is in review" whenever a previous build of
+        # the same version is still queued at Apple. Since we test internally,
+        # leave it off — the build still uploads and processes normally.
+        submit_to_testflight: false
         # To also push it to EXTERNAL testers — which triggers Apple's Beta App
         # Review — uncomment and set your external group name exactly as it
         # appears in App Store Connect → TestFlight → your app.
