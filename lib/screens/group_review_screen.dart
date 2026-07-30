@@ -74,16 +74,15 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     final freed = await provider.deleteAssets(toDelete);
 
     if (freed == 0) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.deleteFailed)),
-        );
-      }
+      // The user declined the system delete prompt (or it failed). Don't nag
+      // and don't block them — just clear the selection so they can carry on
+      // or leave. Photos stay exactly where they were.
+      if (mounted) setState(() => _selectedIds.clear());
       return;
     }
 
     _celebrationKey.currentState
-        ?.celebrate(s.deleted(toDelete.length, _formatBytes(freed)));
+        ?.celebrate(s.freedLabel(_formatBytes(freed)));
 
     // Remove the deleted photos; the rest reflow up. We do NOT auto-advance
     // while photos remain — the user stays on this group and taps "Next".

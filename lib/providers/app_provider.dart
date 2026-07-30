@@ -311,10 +311,13 @@ class AppProvider extends ChangeNotifier {
     if (toDelete.isEmpty) return 0;
     final requestedIds = toDelete.map((a) => a.id).toList();
 
+    // Track whether the platform call actually errored. A plain denial
+    // returns normally with nothing deleted; only a real failure throws.
+    var deleteThrew = false;
     try {
       await PhotoManager.editor.deleteWithIds(requestedIds);
     } catch (e) {
-      // Deny or platform failure — verified below, so don't bail out yet.
+      deleteThrew = true;
       debugPrint('deleteAssets: deleteWithIds threw: $e');
     }
 
@@ -324,10 +327,11 @@ class AppProvider extends ChangeNotifier {
     // gone and treat THAT as the result.
     List<String> deletedIds = await _confirmDeleted(requestedIds);
 
-    // Fallback: nothing was removed → try the system trash (Android 11+).
-    // Trashed items disappear from the library, which is what the user wants,
-    // and the OS purges them after ~30 days.
-    if (deletedIds.isEmpty && Platform.isAndroid) {
+    // Fallback: the delete genuinely FAILED (threw) → try the system trash
+    // (Android 11+). We deliberately do NOT run this after a plain denial:
+    // moveToTrash opens a second system dialog, so the user was being asked
+    // to confirm twice after already saying no.
+    if (deletedIds.isEmpty && deleteThrew && Platform.isAndroid) {
       try {
         await PhotoManager.editor.android.moveToTrash(toDelete);
       } catch (e) {

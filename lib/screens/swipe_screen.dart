@@ -211,7 +211,7 @@ class _SwipeScreenState extends State<SwipeScreen>
 
   /// Delete all queued photos in one batch (one permission dialog).
   /// Returns true if everything was deleted or the queue was empty.
-  Future<bool> _commitDeletions() async {
+  Future<bool> _commitDeletions({bool showError = true}) async {
     if (_pendingDelete.isEmpty) {
       _deletionsCommitted = true;
       return true;
@@ -228,10 +228,16 @@ class _SwipeScreenState extends State<SwipeScreen>
     _isCommitting = false;
 
     if (freed == 0) {
-      _pendingDelete.addAll(batch);
+      // The user declined the system prompt. Do NOT re-queue the batch: it
+      // would be retried from dispose() and they'd be asked a second time
+      // for the same photos. One "no" is enough — the photos simply stay.
+      _deletionsCommitted = true;
       _deletedCount = (_deletedCount - batchCount).clamp(0, _deletedCount);
       _freedBytes = (_freedBytes - batchBytes).clamp(0, _freedBytes);
-      if (mounted) {
+      // When the user is on their way out we skip the error banner — they
+      // declined on purpose, and a message on a disappearing screen just
+      // flashes an ugly box.
+      if (mounted && showError) {
         final s = AppStrings.of(_provider.languageCode);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(s.deleteFailed)),
@@ -244,10 +250,13 @@ class _SwipeScreenState extends State<SwipeScreen>
     return true;
   }
 
+  /// Leave the deck. If the user declines the system delete prompt we still
+  /// go back Home — trapping them on the swipe screen (with only an error
+  /// snackbar) felt broken.
   Future<void> _exitSwipe() async {
     if (_isCommitting) return;
-    final ok = await _commitDeletions();
-    if (mounted && ok) Navigator.of(context).pop();
+    await _commitDeletions(showError: false);
+    if (mounted) Navigator.of(context).pop();
   }
 
   bool get _done => _current >= _queue.length;
@@ -272,7 +281,7 @@ class _SwipeScreenState extends State<SwipeScreen>
 
     final s = AppStrings.of(_provider.languageCode);
     _celebrationKey.currentState
-        ?.celebrate(s.deleted(1, _formatBytes(kAvgPhotoBytes)));
+        ?.celebrate(s.freedLabel(_formatBytes(kAvgPhotoBytes)));
 
     setState(() {
       _current++;
@@ -369,8 +378,16 @@ class _SwipeScreenState extends State<SwipeScreen>
           appBar: AppBar(
             backgroundColor: Colors.black,
             foregroundColor: Colors.white,
-            title: Text(s.swipeMode,
-                style: const TextStyle(color: Colors.white)),
+            // Left-aligned + auto-shrinking: centred titles collide with the
+            // "N left" counter in languages with longer words (e.g. Polish).
+            centerTitle: false,
+            title: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(s.swipeMode,
+                  maxLines: 1,
+                  style: const TextStyle(color: Colors.white)),
+            ),
             leading: IconButton(
               icon: const Icon(Icons.close),
               onPressed: _exitSwipe,
@@ -379,12 +396,20 @@ class _SwipeScreenState extends State<SwipeScreen>
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Center(
-                child: Text(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 130),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
                   '${_queue.length - _current} ${s.remaining}',
+                  maxLines: 1,
                   style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 16,
                       fontWeight: FontWeight.w600),
+                ),
+                  ),
                 ),
               ),
             ),

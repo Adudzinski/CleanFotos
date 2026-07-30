@@ -155,22 +155,16 @@ class _HomeScreenState extends State<HomeScreen>
   /// "Refresh" for a fresh scan.)
   void _afterMode(AppProvider provider, int deletedBefore,
       [int freedBefore = 0]) {
-    // Celebrate what the user just cleaned up, before anything else — this is
-    // the payoff moment for the whole session.
+    // No celebration here: the confetti already fires inside each cleanup
+    // mode as photos are deleted. Repeating it on Home was too much.
     final cleaned = provider.deletedCount - deletedBefore;
-    if (cleaned > 0) {
-      final s = AppStrings.of(provider.languageCode);
-      final freed = provider.freedBytes - freedBefore;
-      _celebrationKey.currentState
-          ?.celebrate(s.deleted(cleaned, _formatBytes(freed)));
-    }
 
     // Only interrupt with an interstitial if the user actually cleaned up
     // something in this session (and the 4-min cooldown has elapsed). Exiting
     // a mode without deleting never triggers an ad.
     final didDelete = provider.deletedCount > deletedBefore;
-    // Let the celebration play out before an ad can cover it.
-    Future<void>.delayed(Duration(milliseconds: cleaned > 0 ? 2600 : 0), () {
+    // Small pause so returning to Home doesn't feel like an ambush.
+    Future<void>.delayed(Duration(milliseconds: cleaned > 0 ? 500 : 0), () {
       final shownAd = didDelete &&
           provider.adsEnabled &&
           AdService.instance.showInterstitial();

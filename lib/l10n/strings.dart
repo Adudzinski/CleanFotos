@@ -80,6 +80,8 @@ class AppStrings {
 
   // ── Celebration ───────────────────────────────────────────────────────────
   String deleted(int n, String size) => '$n photo${n == 1 ? '' : 's'} deleted · $size freed!';
+  /// Short celebration label, e.g. "12 MB freed".
+  String freedLabel(String size) => '$size freed';
 
   // ── Permissions ───────────────────────────────────────────────────────────
   String get permissionTitle => 'Photo Access Required';
@@ -203,6 +205,7 @@ class _SpanishStrings extends AppStrings {
   @override String get sponsored => 'Publicidad';
   @override String get adSwipeHint => 'Desliza en cualquier dirección para continuar';
   @override String deleted(int n, String size) => '${n} foto${n == 1 ? '' : 's'} eliminada${n == 1 ? '' : 's'} · ¡$size liberado!';
+  @override String freedLabel(String size) => '$size liberado';
   @override String get permissionTitle => 'Acceso a fotos requerido';
   @override String get permissionBody => 'CleanFotos necesita acceso a tus fotos.';
   @override String get openSettings => 'Abrir ajustes';
@@ -300,6 +303,7 @@ class _GermanStrings extends AppStrings {
   @override String get sponsored => 'Anzeige';
   @override String get adSwipeHint => 'Wische in eine Richtung, um fortzufahren';
   @override String deleted(int n, String size) => '$n Foto${n == 1 ? '' : 's'} gelöscht · $size freigegeben!';
+  @override String freedLabel(String size) => '$size frei';
   @override String get permissionTitle => 'Fotozugriff erforderlich';
   @override String get permissionBody => 'CleanFotos benötigt Zugriff auf deine Fotos.';
   @override String get openSettings => 'Einstellungen öffnen';
@@ -397,6 +401,7 @@ class _FrenchStrings extends AppStrings {
   @override String get sponsored => 'Sponsorisé';
   @override String get adSwipeHint => 'Balayez dans un sens pour continuer';
   @override String deleted(int n, String size) => '$n photo${n == 1 ? '' : 's'} supprimée${n == 1 ? '' : 's'} · $size libéré !';
+  @override String freedLabel(String size) => '$size libéré';
   @override String get permissionTitle => 'Accès aux photos requis';
   @override String get permissionBody => 'CleanFotos a besoin d\'accéder à vos photos.';
   @override String get openSettings => 'Ouvrir les paramètres';
@@ -494,6 +499,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get sponsored => 'Patrocinado';
   @override String get adSwipeHint => 'Deslize para qualquer lado para continuar';
   @override String deleted(int n, String size) => '$n foto${n == 1 ? '' : 's'} deletada${n == 1 ? '' : 's'} · $size liberado!';
+  @override String freedLabel(String size) => '$size liberado';
   @override String get permissionTitle => 'Acesso às fotos necessário';
   @override String get permissionBody => 'CleanFotos precisa de acesso às suas fotos.';
   @override String get openSettings => 'Abrir configurações';
@@ -591,6 +597,7 @@ class _ItalianStrings extends AppStrings {
   @override String get sponsored => 'Sponsorizzato';
   @override String get adSwipeHint => 'Scorri in una direzione per continuare';
   @override String deleted(int n, String size) => '$n foto eliminate · $size liberato!';
+  @override String freedLabel(String size) => '$size liberato';
   @override String get permissionTitle => 'Accesso alle foto richiesto';
   @override String get permissionBody => 'CleanFotos ha bisogno di accedere alle tue foto.';
   @override String get openSettings => 'Apri impostazioni';
@@ -688,6 +695,7 @@ class _PolishStrings extends AppStrings {
   @override String get sponsored => 'Sponsorowane';
   @override String get adSwipeHint => 'Przesuń w dowolną stronę, aby kontynuować';
   @override String deleted(int n, String size) => '$n zdjęć usunięto · zwolniono $size!';
+  @override String freedLabel(String size) => 'zwolniono $size';
   @override String get permissionTitle => 'Wymagany dostęp do zdjęć';
   @override String get permissionBody => 'CleanFotos potrzebuje dostępu do Twoich zdjęć, aby znaleźć duplikaty. Przyznaj uprawnienia w Ustawieniach.';
   @override String get openSettings => 'Otwórz ustawienia';

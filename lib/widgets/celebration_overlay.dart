@@ -2,16 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:confetti/confetti.dart';
 import '../theme/app_theme.dart';
 
-/// Wrap a screen with this widget to show a confetti burst on demand.
+/// Wrap a screen with this widget to show a quick celebration on demand:
+/// a confetti burst from the centre of the screen, a 🎉 that pops in, and the
+/// amount of space freed underneath it.
+///
+/// Reach it with a [GlobalKey] — `CelebrationOverlay.of(context)` searches
+/// ancestors, and the overlay is normally built *below* the calling screen's
+/// context, so the lookup would return null.
 class CelebrationOverlay extends StatefulWidget {
   final Widget child;
-  final String freedText;
 
-  const CelebrationOverlay({
-    super.key,
-    required this.child,
-    this.freedText = '',
-  });
+  const CelebrationOverlay({super.key, required this.child});
 
   static CelebrationOverlayState? of(BuildContext context) =>
       context.findAncestorStateOfType<CelebrationOverlayState>();
@@ -23,41 +24,48 @@ class CelebrationOverlay extends StatefulWidget {
 class CelebrationOverlayState extends State<CelebrationOverlay>
     with SingleTickerProviderStateMixin {
   late final ConfettiController _confetti;
-  late final AnimationController _badge;
-  late final Animation<double> _badgeScale;
-  bool _showBadge = false;
-  String _badgeText = '';
+  late final AnimationController _pop;
+  late final Animation<double> _scale;
+  late final Animation<double> _fade;
+  bool _visible = false;
+  String _text = '';
+
+  /// Total time the celebration stays on screen. Short, but with an eased
+  /// pop-in and fade-out so it doesn't feel abrupt.
+  static const Duration _hold = Duration(milliseconds: 1100);
 
   @override
   void initState() {
     super.initState();
-    _confetti = ConfettiController(duration: const Duration(seconds: 2));
-    _badge = AnimationController(
+    _confetti = ConfettiController(duration: const Duration(milliseconds: 600));
+    _pop = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 320),
     );
-    _badgeScale = CurvedAnimation(parent: _badge, curve: Curves.elasticOut);
+    _scale = CurvedAnimation(parent: _pop, curve: Curves.easeOutBack);
+    _fade = CurvedAnimation(parent: _pop, curve: Curves.easeOut);
   }
 
   @override
   void dispose() {
     _confetti.dispose();
-    _badge.dispose();
+    _pop.dispose();
     super.dispose();
   }
 
+  /// [message] should be short — e.g. "12 MB freed".
   void celebrate(String message) {
+    if (!mounted) return;
     setState(() {
-      _showBadge = true;
-      _badgeText = message;
+      _visible = true;
+      _text = message;
     });
     _confetti.play();
-    _badge.forward(from: 0);
-    Future.delayed(const Duration(seconds: 2, milliseconds: 500), () {
-      if (mounted) {
-        setState(() => _showBadge = false);
-        _badge.reverse();
-      }
+    _pop.forward(from: 0);
+    Future.delayed(_hold, () async {
+      if (!mounted) return;
+      await _pop.reverse();
+      if (mounted) setState(() => _visible = false);
     });
   }
 
@@ -66,63 +74,64 @@ class CelebrationOverlayState extends State<CelebrationOverlay>
     return Stack(
       children: [
         widget.child,
-        // Confetti emitter at the top center
-        Align(
-          alignment: Alignment.topCenter,
-          child: ConfettiWidget(
-            confettiController: _confetti,
-            blastDirectionality: BlastDirectionality.explosive,
-            numberOfParticles: 40,
-            gravity: 0.3,
-            colors: const [
-              AppTheme.primary,
-              AppTheme.secondary,
-              AppTheme.success,
-              Color(0xFFFFD700),
-              Color(0xFF00E5FF),
-            ],
-            emissionFrequency: 0.3,
-            minimumSize: const Size(6, 3),
-            maximumSize: const Size(14, 7),
+        // Confetti bursts from the centre, where the user is looking.
+        IgnorePointer(
+          child: Align(
+            alignment: Alignment.center,
+            child: ConfettiWidget(
+              confettiController: _confetti,
+              blastDirectionality: BlastDirectionality.explosive,
+              numberOfParticles: 24,
+              gravity: 0.35,
+              maxBlastForce: 18,
+              minBlastForce: 6,
+              colors: const [
+                AppTheme.primary,
+                AppTheme.secondary,
+                AppTheme.success,
+                Color(0xFFFFD700),
+                Color(0xFF00E5FF),
+              ],
+              emissionFrequency: 0.25,
+              minimumSize: const Size(6, 3),
+              maximumSize: const Size(13, 7),
+            ),
           ),
         ),
-        // Floating badge
-        if (_showBadge)
-          Positioned(
-            top: 80,
-            left: 0,
-            right: 0,
+        if (_visible)
+          IgnorePointer(
             child: Center(
-              child: ScaleTransition(
-                scale: _badgeScale,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.success,
-                    borderRadius: BorderRadius.circular(40),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.success.withOpacity(0.4),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('🎉', style: TextStyle(fontSize: 22)),
-                      const SizedBox(width: 10),
-                      Text(
-                        _badgeText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+              // Material ancestor — without it Flutter paints raw Text with an
+              // ugly yellow/red dotted underline.
+              child: Material(
+                type: MaterialType.transparency,
+                child: FadeTransition(
+                  opacity: _fade,
+                  child: ScaleTransition(
+                    scale: _scale,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('🎉', style: TextStyle(fontSize: 64)),
+                        const SizedBox(height: 10),
+                        Text(
+                          _text,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black87,
+                                blurRadius: 12,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
