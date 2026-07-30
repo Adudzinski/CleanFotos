@@ -86,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen>
     final showCoach = provider.state == AppState.ready &&
         !provider.onboardingSeen;
 
-    List<CoachStep> _coachSteps() {
+    List<CoachStep> buildCoachSteps() {
       final steps = <CoachStep>[];
       final hasPhotoModes =
           provider.stats.totalPhotos > 0 &&
@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen>
       return steps;
     }
 
-    final coachSteps = showCoach ? _coachSteps() : const <CoachStep>[];
+    final coachSteps = showCoach ? buildCoachSteps() : const <CoachStep>[];
 
     return CelebrationOverlay(
       key: _celebrationKey,
@@ -154,7 +154,7 @@ class _HomeScreenState extends State<HomeScreen>
   /// user's place. We only show a quick interstitial. (The user can still pull
   /// "Refresh" for a fresh scan.)
   void _afterMode(AppProvider provider, int deletedBefore,
-      [int freedBefore = 0, BuildContext? ctx]) {
+      [int freedBefore = 0]) {
     // Celebrate what the user just cleaned up, before anything else — this is
     // the payoff moment for the whole session.
     final cleaned = provider.deletedCount - deletedBefore;
@@ -221,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen>
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => SwipeScreen(photos: photos)),
-      ).then((_) => _afterMode(provider, deletedBefore, freedBefore, context));
+      ).then((_) => _afterMode(provider, deletedBefore, freedBefore));
     } else {
       final groups = await provider.ensureGroups();
       if (!context.mounted) return;
@@ -234,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen>
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => GroupReviewScreen(groups: groups)),
-      ).then((_) => _afterMode(provider, deletedBefore, freedBefore, context));
+      ).then((_) => _afterMode(provider, deletedBefore, freedBefore));
     }
   }
 
@@ -274,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen>
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => VideoSwipeScreen(videos: videos)),
-    ).then((_) => _afterMode(provider, deletedBefore, freedBefore, context));
+    ).then((_) => _afterMode(provider, deletedBefore, freedBefore));
   }
 
   /// Explains that full video access is needed and offers to open Settings.

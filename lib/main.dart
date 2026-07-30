@@ -30,17 +30,17 @@ void main() async {
   // listing and deletion on Android.
   await PhotoManager.setIgnorePermissionCheck(false);
 
-  runApp(const CleanPicsApp());
+  runApp(const CleanFotosApp());
 }
 
-class CleanPicsApp extends StatefulWidget {
-  const CleanPicsApp({super.key});
+class CleanFotosApp extends StatefulWidget {
+  const CleanFotosApp({super.key});
 
   @override
-  State<CleanPicsApp> createState() => _CleanPicsAppState();
+  State<CleanFotosApp> createState() => _CleanFotosAppState();
 }
 
-class _CleanPicsAppState extends State<CleanPicsApp>
+class _CleanFotosAppState extends State<CleanFotosApp>
     with WidgetsBindingObserver {
   late final AppProvider _provider;
 
