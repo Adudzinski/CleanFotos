@@ -36,7 +36,10 @@ class AppStrings {
   // ── Modes ─────────────────────────────────────────────────────────────────
   String get coachNext => 'Next';
   String get coachDone => 'Got it';
-  String get groupMode => 'Group Review';
+  String get groupMode => 'Picture Group';
+  String get videoGroupMode => 'Video Group';
+  String get videoGroupModeDesc =>
+      'Videos taken within 3 minutes of each other.';
   String get groupModeDesc =>
       'Photos taken within 3 minutes of each other.';
   String get swipeMode => 'Picture Swipe';
@@ -60,6 +63,11 @@ class AppStrings {
   String photosInGroup(int n) => '$n photos';
   String saveUpTo(String size) => 'Save ~$size';
   String get tapToSelectDelete => 'Tap photos to mark for deletion';
+  /// Explains the gesture model in Group Review (no Next button).
+  /// Shown by the idle coach overlay in the group screens.
+  String get idleSwipeHint => 'Pull up or down\nfor the next group';
+  String get idleTapHintPhotos => 'Tap a photo to mark it';
+  String get idleTapHintVideos => 'Tap a video to mark it  ·  Hold to play';
   String get tapToDeselect => 'Tap again to deselect';
   String get continueBtn => 'Next';
   String get deleteBtn => 'Delete';
@@ -174,7 +182,12 @@ class _SpanishStrings extends AppStrings {
   @override String get allClean => 'Todo limpio! 🎉';
   @override String get coachNext => 'Siguiente';
   @override String get coachDone => 'Entendido';
-  @override String get groupMode => 'Revisar grupos';
+  @override String get groupMode => 'Grupo de fotos';
+  @override String get videoGroupMode => 'Grupo de videos';
+  @override String get videoGroupModeDesc => 'Videos tomados con 3 minutos de diferencia.';
+  @override String get idleSwipeHint => 'Desliza arriba o abajo\npara el siguiente grupo';
+  @override String get idleTapHintPhotos => 'Toca una foto para marcarla';
+  @override String get idleTapHintVideos => 'Toca para marcar  ·  Mantén para reproducir';
   @override String get groupModeDesc => 'Fotos tomadas con 3 minutos de diferencia.';
   @override String get swipeMode => 'Deslizar fotos';
   @override String get swipeModeDesc => 'Desliza izquierda para borrar, derecha para conservar.';
@@ -272,7 +285,12 @@ class _GermanStrings extends AppStrings {
   @override String get allClean => 'Alles sauber! 🎉';
   @override String get coachNext => 'Weiter';
   @override String get coachDone => 'Verstanden';
-  @override String get groupMode => 'Gruppen ansehen';
+  @override String get groupMode => 'Fotogruppe';
+  @override String get videoGroupMode => 'Videogruppe';
+  @override String get videoGroupModeDesc => 'Videos, die innerhalb von 3 Minuten entstanden sind.';
+  @override String get idleSwipeHint => 'Nach oben oder unten ziehen\nfür die nächste Gruppe';
+  @override String get idleTapHintPhotos => 'Zum Markieren antippen';
+  @override String get idleTapHintVideos => 'Antippen zum Markieren  ·  Halten zum Abspielen';
   @override String get groupModeDesc => 'Fotos, die innerhalb von 3 Minuten entstanden sind.';
   @override String get swipeMode => 'Bilder wischen';
   @override String get swipeModeDesc => 'Links wischen zum Löschen, rechts zum Behalten.';
@@ -370,7 +388,12 @@ class _FrenchStrings extends AppStrings {
   @override String get allClean => 'Tout est propre ! 🎉';
   @override String get coachNext => 'Suivant';
   @override String get coachDone => 'Compris';
-  @override String get groupMode => 'Révision par groupe';
+  @override String get groupMode => 'Groupe photos';
+  @override String get videoGroupMode => 'Groupe vidéos';
+  @override String get videoGroupModeDesc => 'Vidéos prises à moins de 3 minutes.';
+  @override String get idleSwipeHint => 'Tirez vers le haut ou le bas\npour le groupe suivant';
+  @override String get idleTapHintPhotos => 'Appuyez pour marquer';
+  @override String get idleTapHintVideos => 'Appuyez pour marquer  ·  Maintenez pour lire';
   @override String get groupModeDesc => 'Photos prises à moins de 3 minutes.';
   @override String get swipeMode => 'Balayer les photos';
   @override String get swipeModeDesc => 'Balayez à gauche pour supprimer, à droite pour garder.';
@@ -468,7 +491,12 @@ class _PortugueseStrings extends AppStrings {
   @override String get allClean => 'Tudo limpo! 🎉';
   @override String get coachNext => 'Próximo';
   @override String get coachDone => 'Entendi';
-  @override String get groupMode => 'Revisão em grupo';
+  @override String get groupMode => 'Grupo de fotos';
+  @override String get videoGroupMode => 'Grupo de vídeos';
+  @override String get videoGroupModeDesc => 'Vídeos gravados com até 3 minutos de diferença.';
+  @override String get idleSwipeHint => 'Puxe para cima ou para baixo\npara o próximo grupo';
+  @override String get idleTapHintPhotos => 'Toque para marcar';
+  @override String get idleTapHintVideos => 'Toque para marcar  ·  Segure para reproduzir';
   @override String get groupModeDesc => 'Fotos tiradas com até 3 minutos de diferença.';
   @override String get swipeMode => 'Deslizar fotos';
   @override String get swipeModeDesc => 'Deslize para esquerda para deletar, direita para manter.';
@@ -566,7 +594,12 @@ class _ItalianStrings extends AppStrings {
   @override String get allClean => 'Tutto pulito! 🎉';
   @override String get coachNext => 'Avanti';
   @override String get coachDone => 'Capito';
-  @override String get groupMode => 'Revisione per gruppo';
+  @override String get groupMode => 'Gruppo foto';
+  @override String get videoGroupMode => 'Gruppo video';
+  @override String get videoGroupModeDesc => 'Video girati a meno di 3 minuti di distanza.';
+  @override String get idleSwipeHint => 'Trascina su o giù\nper il gruppo successivo';
+  @override String get idleTapHintPhotos => 'Tocca per marcare';
+  @override String get idleTapHintVideos => 'Tocca per marcare  ·  Tieni premuto per riprodurre';
   @override String get groupModeDesc => 'Foto scattate a meno di 3 minuti di distanza.';
   @override String get swipeMode => 'Scorri foto';
   @override String get swipeModeDesc => 'Scorri a sinistra per eliminare, a destra per tenere.';
@@ -664,7 +697,12 @@ class _PolishStrings extends AppStrings {
   @override String get allClean => 'Wszystko czyste! 🎉';
   @override String get coachNext => 'Dalej';
   @override String get coachDone => 'Rozumiem';
-  @override String get groupMode => 'Przegląd grup';
+  @override String get groupMode => 'Grupa zdjęć';
+  @override String get videoGroupMode => 'Grupa wideo';
+  @override String get videoGroupModeDesc => 'Filmy nagrane w odstępie 3 minut.';
+  @override String get idleSwipeHint => 'Przeciągnij w górę lub w dół\ndo następnej grupy';
+  @override String get idleTapHintPhotos => 'Dotknij, aby oznaczyć';
+  @override String get idleTapHintVideos => 'Dotknij, aby oznaczyć  ·  Przytrzymaj, aby odtworzyć';
   @override String get groupModeDesc => 'Zdjęcia zrobione w odstępie 3 minut.';
   @override String get swipeMode => 'Przesuwanie zdjęć';
   @override String get swipeModeDesc => 'Przesuń w lewo, aby usunąć, w prawo, aby zachować.';

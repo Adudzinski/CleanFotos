@@ -11,6 +11,7 @@ import '../services/ad_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/celebration_overlay.dart';
 import '../l10n/strings.dart';
+import 'video_group_review_screen.dart' show buildAssetVideoController;
 
 /// Distinct accent for the video-cleanup mode.
 const Color kVideoAccent = Color(0xFF16BFA6);
@@ -130,9 +131,8 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
 
   Future<void> _loadVideo(AssetEntity asset) async {
     try {
-      final url = await asset.getMediaUrl();
-      if (url == null || !mounted) return;
-      final ctrl = VideoPlayerController.contentUri(Uri.parse(url));
+      final ctrl = await buildAssetVideoController(asset);
+      if (ctrl == null || !mounted) return;
       _videoCtrl = ctrl;
       await ctrl.initialize();
       await ctrl.setLooping(true);

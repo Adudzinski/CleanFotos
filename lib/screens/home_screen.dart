@@ -13,6 +13,7 @@ import '../widgets/coachmark_overlay.dart';
 import 'group_review_screen.dart';
 import 'swipe_screen.dart';
 import 'video_swipe_screen.dart';
+import 'video_group_review_screen.dart';
 import 'settings_screen.dart';
 import '../l10n/strings.dart';
 
@@ -233,8 +234,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   /// Load all videos on demand, then open the video swipe deck.
+  /// Opens a video cleanup mode. [grouped] picks Video Group (time-grouped)
+  /// over Video Swipe; both share the same access + loading flow.
   Future<void> _openVideoMode(
-      BuildContext context, AppProvider provider, AppStrings s) async {
+      BuildContext context, AppProvider provider, AppStrings s,
+      {bool grouped = false}) async {
     final deletedBefore = provider.deletedCount;
     final freedBefore = provider.freedBytes;
     final access = await _videoService.ensureAccess();
@@ -262,6 +266,22 @@ class _HomeScreenState extends State<HomeScreen>
       // Android 13+, so guide the user to grant full access rather than
       // misleadingly saying "all clean".
       await _showVideoAccessDialog(context, s);
+      return;
+    }
+
+    if (grouped) {
+      final vGroups = await provider.ensureVideoGroups(videos);
+      if (!context.mounted) return;
+      if (vGroups.isEmpty) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(s.allClean)));
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => VideoGroupReviewScreen(groups: vGroups)),
+      ).then((_) => _afterMode(provider, deletedBefore, freedBefore));
       return;
     }
 
@@ -486,7 +506,36 @@ class _HomeScreenState extends State<HomeScreen>
           // ── Cleanup actions (front and center) ───────────────────────────
           // The modes load + group photos on demand (see _openMode), so they're
           // available as soon as the library has photos — no upfront scan.
-          // Group review — only when there are (or might be) duplicate groups.
+          // Order: videos first (blue → teal), then photos (pink → red), so
+          // each media type reads as a colour family.
+
+          // Video Group — the group model, for videos.
+          _buildModeCard(
+            context,
+            icon: Icons.video_collection_rounded,
+            title: s.videoGroupMode,
+            subtitle: s.videoGroupModeDesc,
+            gradient: const [Color(0xFF2563EB), Color(0xFF1B4FC4)],
+            enabled: true,
+            onTap: () =>
+                _openVideoMode(context, provider, s, grouped: true),
+          ),
+          const SizedBox(height: 14),
+
+          // Video swipe — every video, one at a time.
+          _buildModeCard(
+            context,
+            cardKey: _videoCardKey,
+            icon: Icons.video_library_rounded,
+            title: s.videoMode,
+            subtitle: s.videoModeDesc,
+            gradient: const [kVideoAccent, Color(0xFF0E9E88)],
+            enabled: true,
+            onTap: () => _openVideoMode(context, provider, s),
+          ),
+          const SizedBox(height: 14),
+
+          // Picture Group — only when there are (or might be) duplicate groups.
           if (!provider.groupsLoaded || groupCount > 0) ...[
             _buildModeCard(
               context,
@@ -494,7 +543,8 @@ class _HomeScreenState extends State<HomeScreen>
               icon: Icons.grid_view_rounded,
               title: s.groupMode,
               subtitle: s.groupModeDesc,
-              gradient: const [AppTheme.primary, AppTheme.primaryDark],
+              // Deeper rose — same family as Picture Swipe's pink.
+              gradient: const [Color(0xFFE8537A), Color(0xFFC2264C)],
               enabled: provider.stats.totalPhotos > 0,
               onTap: () => _openMode(context, provider, s, swipe: false),
             ),
@@ -513,20 +563,7 @@ class _HomeScreenState extends State<HomeScreen>
               enabled: true,
               onTap: () => _openMode(context, provider, s, swipe: true),
             ),
-            const SizedBox(height: 14),
           ],
-
-          // Video cleanup — always available.
-          _buildModeCard(
-            context,
-            cardKey: _videoCardKey,
-            icon: Icons.video_library_rounded,
-            title: s.videoMode,
-            subtitle: s.videoModeDesc,
-            gradient: const [kVideoAccent, Color(0xFF0E9E88)],
-            enabled: true,
-            onTap: () => _openVideoMode(context, provider, s),
-          ),
 
           if (provider.groupsLoaded && groupCount == 0) ...[
             const SizedBox(height: 20),

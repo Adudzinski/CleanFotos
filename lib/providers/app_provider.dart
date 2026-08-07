@@ -234,6 +234,23 @@ class AppProvider extends ChangeNotifier {
   /// Load the photo library and group it by time — on demand, and cached so it
   /// only runs once per scan. Call this when the user opens a cleanup mode
   /// (group review / swipe). Returns the resulting groups.
+  /// Time-grouped VIDEOS, cached like [ensureGroups]. Reuses the same grouping
+  /// algorithm — it works on any asset list, not just photos.
+  List<PhotoGroup> videoGroups = [];
+  bool videoGroupsLoaded = false;
+
+  Future<List<PhotoGroup>> ensureVideoGroups(List<AssetEntity> videos) async {
+    if (videoGroupsLoaded) return videoGroups;
+    try {
+      videoGroups = await _service.groupAssets(videos);
+      videoGroupsLoaded = true;
+    } catch (e) {
+      debugPrint('ensureVideoGroups failed: $e');
+    }
+    notifyListeners();
+    return videoGroups;
+  }
+
   Future<List<PhotoGroup>> ensureGroups() async {
     if (groupsLoaded) return groups;
 
@@ -271,6 +288,8 @@ class AppProvider extends ChangeNotifier {
     state = AppState.loading;
     groups = [];
     groupsLoaded = false;
+    videoGroups = [];
+    videoGroupsLoaded = false;
     allPhotos = [];
     photosLoaded = false;
     await clearCursors();
@@ -366,6 +385,12 @@ class AppProvider extends ChangeNotifier {
       allPhotos =
           allPhotos.where((a) => !deletedSet.contains(a.id)).toList();
     }
+    videoGroups = videoGroups
+        .map((g) => g.copyWith(
+            assets:
+                g.assets.where((a) => !deletedSet.contains(a.id)).toList()))
+        .where((g) => g.assets.length >= 2)
+        .toList();
     groups = groups
         .map((g) {
           final remaining =

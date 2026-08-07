@@ -7,7 +7,11 @@ import '../utils/asset_utils.dart';
 import '../theme/app_theme.dart';
 import '../widgets/photo_card.dart';
 import '../widgets/celebration_overlay.dart';
+import '../widgets/idle_gesture_hint.dart';
 import '../l10n/strings.dart';
+
+/// Picture Group's accent — a deeper rose, same family as Picture Swipe's pink.
+const Color kPictureGroupAccent = Color(0xFFE8537A);
 
 class GroupReviewScreen extends StatefulWidget {
   final List<PhotoGroup> groups;
@@ -32,11 +36,28 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   final GlobalKey<CelebrationOverlayState> _celebrationKey =
       GlobalKey<CelebrationOverlayState>();
 
+  /// Photos marked across ALL groups, deleted in one batch when leaving.
+  final List<AssetEntity> _pendingDelete = [];
+  bool _deletionsCommitted = false;
+
+  /// Grid scrolling + how far the user has pulled past either end.
+  final ScrollController _scroll = ScrollController();
+  double _overscroll = 0;
+
+  /// How far past the edge you must pull to flip to the next/previous group.
+  static const double _kOverscrollTrigger = 90;
+
   @override
   void initState() {
     super.initState();
     _groups = List.from(widget.groups);
     _loadGroup(0);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   void _loadGroup(int index) {
@@ -61,55 +82,92 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     });
   }
 
-  Future<void> _deleteSelected() async {
+  /// Queue whatever is selected in this group for deletion. Nothing is removed
+  /// from the device yet — everything is committed in ONE system prompt when
+  /// the user leaves (see [_commitDeletions]), which is what keeps the flow
+  /// fast instead of firing an OS dialog per group.
+  void _queueSelected() {
     if (_selectedIds.isEmpty) return;
-
-    final provider = context.read<AppProvider>();
-    final s = AppStrings.of(provider.languageCode);
-
-    final toDelete =
+    final picked =
         _photos.where((a) => _selectedIds.contains(a.id)).toList();
-    if (toDelete.isEmpty) return;
+    if (picked.isEmpty) return;
 
-    final freed = await provider.deleteAssets(toDelete);
+    _pendingDelete.addAll(picked);
+    final s = AppStrings.of(context.read<AppProvider>().languageCode);
+    _celebrationKey.currentState?.celebrate(
+        s.freedLabel(_formatBytes(picked.length * kAvgPhotoBytes)));
 
-    if (freed == 0) {
-      // The user declined the system delete prompt (or it failed). Don't nag
-      // and don't block them — just clear the selection so they can carry on
-      // or leave. Photos stay exactly where they were.
-      if (mounted) setState(() => _selectedIds.clear());
-      return;
-    }
-
-    _celebrationKey.currentState
-        ?.celebrate(s.freedLabel(_formatBytes(freed)));
-
-    // Remove the deleted photos; the rest reflow up. We do NOT auto-advance
-    // while photos remain — the user stays on this group and taps "Next".
     setState(() {
-      final del = Set<String>.from(_selectedIds);
-      _photos.removeWhere((a) => del.contains(a.id));
+      final queued = Set<String>.from(_selectedIds);
+      _photos.removeWhere((a) => queued.contains(a.id));
       _selectedIds.clear();
     });
-
-    // ...but if the whole group is gone there's nothing left to review, so
-    // move straight on to the next group.
-    if (_photos.isEmpty) {
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      if (!mounted) return;
-      _advanceGroup();
-    }
   }
 
+  /// Delete everything queued across all groups in a single batch.
+  Future<void> _commitDeletions() async {
+    if (_deletionsCommitted || _pendingDelete.isEmpty) return;
+    _deletionsCommitted = true;
+    final provider = context.read<AppProvider>();
+    final batch = List<AssetEntity>.from(_pendingDelete);
+    _pendingDelete.clear();
+    await provider.deleteAssets(batch);
+    // A declined prompt is final — the photos simply stay in the library.
+  }
+
+  /// Leave Group Review, committing queued deletions first.
+  Future<void> _exitGroupReview() async {
+    await _commitDeletions();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Move to the next group, queueing anything selected on the way out.
   void _advanceGroup() {
+    _queueSelected();
     if (_hasMore) {
       setState(() {
         _currentIndex++;
         _loadGroup(_currentIndex);
       });
+      _resetScroll();
     } else {
-      Navigator.pop(context);
+      _exitGroupReview();
     }
+  }
+
+  /// Move back to the previous group, queueing anything selected first.
+  void _previousGroup() {
+    _queueSelected();
+    if (_currentIndex == 0) return;
+    setState(() {
+      _currentIndex--;
+      _loadGroup(_currentIndex);
+    });
+    _resetScroll();
+  }
+
+  void _resetScroll() {
+    _overscroll = 0;
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  /// Turn an overscroll past either end of the grid into group navigation.
+  /// Scrolling inside a group keeps working normally; only pulling *beyond*
+  /// the edge switches groups, so the two gestures never fight.
+  bool _onScrollNotification(ScrollNotification n) {
+    if (n is OverscrollNotification) {
+      _overscroll += n.overscroll;
+      if (_overscroll > _kOverscrollTrigger) {
+        _overscroll = 0;
+        _advanceGroup();
+      } else if (_overscroll < -_kOverscrollTrigger) {
+        _overscroll = 0;
+        _previousGroup();
+      }
+    } else if (n is ScrollEndNotification) {
+      _overscroll = 0;
+    }
+    return false;
   }
 
   @override
@@ -128,12 +186,20 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     final remaining = _photos.length;
     final totalInGroup = group.totalCount;
 
-    return CelebrationOverlay(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _exitGroupReview();
+      },
+      child: CelebrationOverlay(
       key: _celebrationKey,
       child: Scaffold(
         backgroundColor: AppTheme.background,
         appBar: _buildAppBar(context, s),
-        body: Column(
+        body: IdleGestureHint(
+          tapHint: s.idleTapHintPhotos,
+          swipeHint: s.idleSwipeHint,
+          child: Column(
           children: [
             // Progress
             _buildProgressBar(context, s),
@@ -153,6 +219,8 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
             _buildActionBar(context, s),
           ],
         ),
+        ),
+      ),
       ),
     );
   }
@@ -162,7 +230,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       title: Text(s.groupMode),
       leading: IconButton(
         icon: const Icon(Icons.close),
-        onPressed: () => Navigator.pop(context),
+        onPressed: _exitGroupReview,
       ),
     );
   }
@@ -192,7 +260,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                 style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.primary),
+                    color: kPictureGroupAccent),
               ),
             ],
           ),
@@ -202,9 +270,9 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 6,
-              backgroundColor: AppTheme.primary.withOpacity(0.15),
+              backgroundColor: kPictureGroupAccent.withValues(alpha: 0.15),
               valueColor:
-                  const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                  const AlwaysStoppedAnimation<Color>(kPictureGroupAccent),
             ),
           ),
         ],
@@ -252,7 +320,13 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
 
   Widget _buildPhotoGrid(BuildContext context, AppStrings s) {
     // All photos in the group, in a scrollable grid (same tile size as before).
-    return GridView.builder(
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScrollNotification,
+      child: GridView.builder(
+      controller: _scroll,
+      // Always scrollable so an overscroll gesture exists even when the group
+      // has too few photos to fill the screen.
+      physics: const AlwaysScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 12,
@@ -271,6 +345,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
           onLongPress: () => PhotoDetailDialog.show(context, asset),
         );
       },
+      ),
     );
   }
 
@@ -293,18 +368,6 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Hint text
-          Text(
-            hasSelection
-                ? s.tapToDeselect
-                : s.tapToSelectDelete,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 17,
-                color: AppTheme.textSecondary,
-                fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
           Text(
             s.recoverHint,
             textAlign: TextAlign.center,
@@ -312,61 +375,35 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                 fontSize: 16, color: AppTheme.textSecondary),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              // Continue / Next
-              Expanded(
-                flex: 3,
-                child: ElevatedButton.icon(
-                  onPressed: _advanceGroup,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(56),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    textStyle: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-                  label: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(s.continueBtn, maxLines: 1),
-                  ),
+          // One action only. "Next" is gone: swipe right, or pull past the
+          // top/bottom of the grid, to move between groups — anything marked
+          // is queued automatically.
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: hasSelection ? _advanceGroup : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.danger,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppTheme.danger.withOpacity(0.4),
+                disabledForegroundColor: Colors.white70,
+                minimumSize: const Size.fromHeight(56),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                textStyle: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              icon: const Icon(Icons.delete_outline, size: 20),
+              label: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  hasSelection ? s.deleteCount(selectedCount) : s.deleteBtn,
+                  maxLines: 1,
                 ),
               ),
-              const SizedBox(width: 12),
-              // Delete
-              Expanded(
-                flex: 4,
-                child: ElevatedButton.icon(
-                  onPressed: hasSelection ? _deleteSelected : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.danger,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppTheme.danger.withOpacity(0.4),
-                    disabledForegroundColor: Colors.white70,
-                    minimumSize: const Size.fromHeight(56),
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    textStyle: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  label: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      hasSelection ? s.deleteCount(selectedCount) : s.deleteBtn,
-                      maxLines: 1,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
