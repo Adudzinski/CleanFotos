@@ -67,6 +67,8 @@ class _VideoGroupReviewScreenState extends State<VideoGroupReviewScreen> {
 
   final ScrollController _scroll = ScrollController();
   double _overscroll = 0;
+  /// Guards against the iOS bounce re-triggering navigation.
+  bool _navLock = false;
   static const double _kOverscrollTrigger = 90;
 
   // ── Hold-to-play, inline in the tile ──────────────────────────────────────
@@ -218,21 +220,49 @@ class _VideoGroupReviewScreenState extends State<VideoGroupReviewScreen> {
 
   void _resetScroll() {
     _overscroll = 0;
+    _navLock = false;
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
+  /// Detect a pull past either end of the grid and turn it into group
+  /// navigation. This must handle BOTH scroll physics:
+  ///
+  ///  • Android (ClampingScrollPhysics) never scrolls past the edge and instead
+  ///    reports OverscrollNotification deltas.
+  ///  • iOS (BouncingScrollPhysics) lets the position travel beyond the edge
+  ///    and emits almost no overscroll notifications — so we measure how far
+  ///    past the extent we are instead. Without this, the gesture silently did
+  ///    nothing on iPhone.
   bool _onScrollNotification(ScrollNotification n) {
-    if (n is OverscrollNotification) {
-      _overscroll += n.overscroll;
-      if (_overscroll > _kOverscrollTrigger) {
-        _overscroll = 0;
-        _advanceGroup();
-      } else if (_overscroll < -_kOverscrollTrigger) {
-        _overscroll = 0;
-        _previousGroup();
-      }
-    } else if (n is ScrollEndNotification) {
+    if (n is ScrollEndNotification) {
       _overscroll = 0;
+      _navLock = false;
+      return false;
+    }
+    if (_navLock) return false;
+
+    final m = n.metrics;
+    double past = 0;
+    if (m.pixels > m.maxScrollExtent) {
+      past = m.pixels - m.maxScrollExtent;
+    } else if (m.pixels < m.minScrollExtent) {
+      past = m.pixels - m.minScrollExtent;
+    }
+
+    if (past != 0) {
+      _overscroll = past; // iOS: absolute overshoot
+    } else if (n is OverscrollNotification) {
+      _overscroll += n.overscroll; // Android: accumulated deltas
+    }
+
+    if (_overscroll > _kOverscrollTrigger) {
+      _overscroll = 0;
+      _navLock = true; // don't re-fire while the bounce settles
+      _advanceGroup();
+    } else if (_overscroll < -_kOverscrollTrigger) {
+      _overscroll = 0;
+      _navLock = true;
+      _previousGroup();
     }
     return false;
   }
