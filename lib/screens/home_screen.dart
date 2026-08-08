@@ -24,6 +24,10 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+/// Every mode card is exactly this tall. Cards show the mode name only, so
+/// the home list stays perfectly even in all 7 languages.
+const double _kModeCardHeight = 96;
+
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _pulseController;
@@ -33,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen>
   final GlobalKey _groupCardKey = GlobalKey();
   final GlobalKey _swipeCardKey = GlobalKey();
   final GlobalKey _videoCardKey = GlobalKey();
+  final GlobalKey _videoGroupCardKey = GlobalKey();
 
   final VideoService _videoService = VideoService();
 
@@ -87,11 +92,23 @@ class _HomeScreenState extends State<HomeScreen>
     final showCoach = provider.state == AppState.ready &&
         !provider.onboardingSeen;
 
+    // The tour walks the mode cards in the order they appear on screen:
+    // Video Group → Video Swipe → Picture Group → Picture Swipe.
     List<CoachStep> buildCoachSteps() {
-      final steps = <CoachStep>[];
-      final hasPhotoModes =
-          provider.stats.totalPhotos > 0 &&
-              (!provider.groupsLoaded || provider.groups.isNotEmpty);
+      final steps = <CoachStep>[
+        CoachStep(
+          targetKey: _videoGroupCardKey,
+          title: s.videoGroupMode,
+          body: s.videoGroupModeDesc,
+        ),
+        CoachStep(
+          targetKey: _videoCardKey,
+          title: s.videoMode,
+          body: s.videoModeDesc,
+        ),
+      ];
+      final hasPhotoModes = provider.stats.totalPhotos > 0 &&
+          (!provider.groupsLoaded || provider.groups.isNotEmpty);
       if (hasPhotoModes) {
         steps.add(CoachStep(
           targetKey: _groupCardKey,
@@ -106,11 +123,6 @@ class _HomeScreenState extends State<HomeScreen>
           body: s.swipeModeDesc,
         ));
       }
-      steps.add(CoachStep(
-        targetKey: _videoCardKey,
-        title: s.videoMode,
-        body: s.videoModeDesc,
-      ));
       return steps;
     }
 
@@ -512,9 +524,10 @@ class _HomeScreenState extends State<HomeScreen>
           // Video Group — the group model, for videos.
           _buildModeCard(
             context,
-            icon: Icons.video_collection_rounded,
+            cardKey: _videoGroupCardKey,
+            // many videos = group
+            icon: Icons.video_library_rounded,
             title: s.videoGroupMode,
-            subtitle: s.videoGroupModeDesc,
             gradient: const [Color(0xFF2563EB), Color(0xFF1B4FC4)],
             enabled: true,
             onTap: () =>
@@ -526,9 +539,10 @@ class _HomeScreenState extends State<HomeScreen>
           _buildModeCard(
             context,
             cardKey: _videoCardKey,
-            icon: Icons.video_library_rounded,
+            // one video + swiping hand = swipe
+            icon: Icons.smart_display_rounded,
+            badgeIcon: Icons.swipe_rounded,
             title: s.videoMode,
-            subtitle: s.videoModeDesc,
             gradient: const [kVideoAccent, Color(0xFF0E9E88)],
             enabled: true,
             onTap: () => _openVideoMode(context, provider, s),
@@ -540,11 +554,12 @@ class _HomeScreenState extends State<HomeScreen>
             _buildModeCard(
               context,
               cardKey: _groupCardKey,
-              icon: Icons.grid_view_rounded,
+              // many photos = group
+              icon: Icons.collections_rounded,
               title: s.groupMode,
-              subtitle: s.groupModeDesc,
-              // Deeper rose — same family as Picture Swipe's pink.
-              gradient: const [Color(0xFFE8537A), Color(0xFFC2264C)],
+              // Deep crimson: same red family as Picture Swipe's coral pink,
+              // but several shades darker so the two never read as one card.
+              gradient: const [Color(0xFFC2185B), Color(0xFF7B0D3B)],
               enabled: provider.stats.totalPhotos > 0,
               onTap: () => _openMode(context, provider, s, swipe: false),
             ),
@@ -556,9 +571,10 @@ class _HomeScreenState extends State<HomeScreen>
             _buildModeCard(
               context,
               cardKey: _swipeCardKey,
-              icon: Icons.swipe_rounded,
+              // one photo + swiping hand = swipe
+              icon: Icons.photo_rounded,
+              badgeIcon: Icons.swipe_rounded,
               title: s.swipeMode,
-              subtitle: s.swipeModeDesc,
               gradient: const [AppTheme.secondary, Color(0xFFE84A6F)],
               enabled: true,
               onTap: () => _openMode(context, provider, s, swipe: true),
@@ -691,7 +707,6 @@ class _HomeScreenState extends State<HomeScreen>
       context,
       icon: Icons.block_rounded,
       title: s.removeAds,
-      subtitle: s.proTitle,
       gradient: const [Color(0xFFFFA33F), Color(0xFFF57C00)],
       enabled: true,
       onTap: () async {
@@ -835,8 +850,11 @@ class _HomeScreenState extends State<HomeScreen>
     BuildContext context, {
     Key? cardKey,
     required IconData icon,
+    /// Small glyph stamped on the corner of [icon] — used to mark the swipe
+    /// modes with a hand, so "one item + swipe" vs "many items" reads at a
+    /// glance for both photos and videos.
+    IconData? badgeIcon,
     required String title,
-    required String subtitle,
     required List<Color> gradient,
     required bool enabled,
     required VoidCallback onTap,
@@ -848,7 +866,8 @@ class _HomeScreenState extends State<HomeScreen>
         opacity: enabled ? 1.0 : 0.5,
         duration: const Duration(milliseconds: 200),
         child: Container(
-          padding: const EdgeInsets.all(22),
+          height: _kModeCardHeight,
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: gradient,
@@ -873,26 +892,30 @@ class _HomeScreenState extends State<HomeScreen>
                   color: Colors.white.withOpacity(0.22),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: Colors.white, size: 32),
+                child: badgeIcon == null
+                    ? Icon(icon, color: Colors.white, size: 32)
+                    : Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Icon(icon, color: Colors.white, size: 30),
+                          Positioned(
+                            right: 4,
+                            bottom: 4,
+                            child: Icon(badgeIcon,
+                                color: Colors.white, size: 20),
+                          ),
+                        ],
+                      ),
               ),
               const SizedBox(width: 18),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white)),
-                    const SizedBox(height: 4),
-                    Text(subtitle,
-                        style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.9),
-                            height: 1.4)),
-                  ],
-                ),
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
               ),
               Icon(Icons.arrow_forward_ios_rounded,
                   color: Colors.white.withOpacity(0.9), size: 22),
