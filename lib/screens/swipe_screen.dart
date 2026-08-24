@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -219,12 +221,16 @@ class _SwipeScreenState extends State<SwipeScreen>
     if (_isCommitting) return false;
     _isCommitting = true;
 
-    final batch = List<AssetEntity>.from(_pendingDelete);
-    final batchCount = batch.length;
+    final batchCount = _pendingDelete.length;
     final batchBytes = batchCount * kAvgPhotoBytes;
     _pendingDelete.clear();
 
-    final freed = await _provider.deleteAssets(batch);
+    // Delete through the provider's persisted queue rather than a local list.
+    // Every swipe-left already wrote its id there, so if the app is killed
+    // while the OS prompt is up the marks survive and Home picks them up next
+    // launch. flushPendingDeletions() clears them only once the user has
+    // actually answered.
+    final freed = await _provider.flushPendingDeletions();
     _isCommitting = false;
 
     if (freed == 0) {
@@ -276,6 +282,11 @@ class _SwipeScreenState extends State<SwipeScreen>
 
     // Queue for batch deletion (don't hit the OS dialog per swipe).
     _pendingDelete.add(_queue[_current]);
+    // Also persist the mark immediately. _pendingDelete only lives in this
+    // widget's memory, so a force-quit mid-session would lose it silently;
+    // the provider writes the id to disk, letting Home offer to finish the
+    // cleanup next launch. Fire-and-forget so the swipe stays instant.
+    unawaited(_provider.queueForDeletion([_queue[_current]], notify: false));
     _deletedCount++;
     _freedBytes += kAvgPhotoBytes;
 

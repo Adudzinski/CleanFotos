@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -178,12 +180,16 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
     if (_isCommitting) return false;
     _isCommitting = true;
 
-    final batch = List<AssetEntity>.from(_pendingDelete);
-    final batchCount = batch.length;
+    final batchCount = _pendingDelete.length;
     final batchBytes = batchCount * kAvgVideoBytes;
     _pendingDelete.clear();
 
-    final freed = await _provider.deleteAssets(batch);
+    // Delete through the provider's persisted queue rather than a local list.
+    // Every delete-swipe already wrote its id there, so if the app is killed
+    // while the OS prompt is up the marks survive and Home picks them up next
+    // launch. flushPendingDeletions() clears them only once the user has
+    // actually answered.
+    final freed = await _provider.flushPendingDeletions();
     _isCommitting = false;
 
     if (freed == 0) {
@@ -231,6 +237,11 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
     final item = _deck[_current];
     if (item.type == _ItemType.video) {
       _pendingDelete.add(item.asset!);
+      // Also persist the mark immediately. _pendingDelete only lives in this
+      // widget's memory, so a force-quit mid-session would lose it silently;
+      // the provider writes the id to disk, letting Home offer to finish the
+      // cleanup next launch. Fire-and-forget so the swipe stays instant.
+      unawaited(_provider.queueForDeletion([item.asset!], notify: false));
       _deletedCount++;
       _freedBytes += kAvgVideoBytes;
       final s = AppStrings.of(_provider.languageCode);

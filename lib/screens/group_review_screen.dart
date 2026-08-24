@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -36,9 +38,8 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   final GlobalKey<CelebrationOverlayState> _celebrationKey =
       GlobalKey<CelebrationOverlayState>();
 
-  /// Photos marked across ALL groups, deleted in one batch when leaving.
-  final List<AssetEntity> _pendingDelete = [];
-  bool _deletionsCommitted = false;
+  /// True while the single end-of-session delete is running.
+  bool _isCommitting = false;
 
   /// Grid scrolling + how far the user has pulled past either end.
   final ScrollController _scroll = ScrollController();
@@ -84,18 +85,23 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     });
   }
 
-  /// Queue whatever is selected in this group for deletion. Nothing is removed
-  /// from the device yet — everything is committed in ONE system prompt when
-  /// the user leaves (see [_commitDeletions]), which is what keeps the flow
-  /// fast instead of firing an OS dialog per group.
+  /// Mark the current selection for deletion.
+  ///
+  /// Nothing leaves the device yet: the marks are persisted and everything is
+  /// deleted in ONE system prompt when the user exits. Persisting means a
+  /// force-quit can't lose the work — the next launch finishes it.
   void _queueSelected() {
     if (_selectedIds.isEmpty) return;
     final picked =
         _photos.where((a) => _selectedIds.contains(a.id)).toList();
     if (picked.isEmpty) return;
 
-    _pendingDelete.addAll(picked);
-    final s = AppStrings.of(context.read<AppProvider>().languageCode);
+    // Persist the marks immediately. The OS confirmation can only be shown by
+    // a foreground app, so if the user force-quits mid-session we finish the
+    // job on next launch instead of silently losing their work.
+    final provider = context.read<AppProvider>();
+    unawaited(provider.queueForDeletion(picked));
+    final s = AppStrings.of(provider.languageCode);
     _celebrationKey.currentState?.celebrate(
         s.freedLabel(_formatBytes(picked.length * kAvgPhotoBytes)));
 
@@ -106,15 +112,12 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     });
   }
 
-  /// Delete everything queued across all groups in a single batch.
+  /// Delete everything marked this session — one system prompt, on exit.
   Future<void> _commitDeletions() async {
-    if (_deletionsCommitted || _pendingDelete.isEmpty) return;
-    _deletionsCommitted = true;
-    final provider = context.read<AppProvider>();
-    final batch = List<AssetEntity>.from(_pendingDelete);
-    _pendingDelete.clear();
-    await provider.deleteAssets(batch);
-    // A declined prompt is final — the photos simply stay in the library.
+    if (_isCommitting) return;
+    _isCommitting = true;
+    await context.read<AppProvider>().flushPendingDeletions();
+    _isCommitting = false;
   }
 
   /// Leave Group Review, committing queued deletions first.

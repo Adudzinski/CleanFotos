@@ -104,6 +104,14 @@ class AppStrings {
       'CleanFotos can only see the photos you selected. Open Settings and set "Photos and videos" to Allow all.';
   String get notNow => 'Not now';
 
+  // ── Unfinished cleanup (marks that survived the app closing) ──────────────
+  String get pendingTitle => 'Finish your cleanup';
+  String pendingBody(int n) =>
+      'You marked $n item${n == 1 ? '' : 's'} for deletion last time but didn\'t '
+      'confirm it. Delete them now?';
+  String get pendingConfirm => 'Delete them';
+  String get pendingLater => 'Keep them';
+
   // ── Error ─────────────────────────────────────────────────────────────────
   String get errorMessage => 'Something went wrong';
   String get deleteFailed =>
@@ -227,6 +235,10 @@ class _SpanishStrings extends AppStrings {
   @override String get limitedAccessTitle => 'No se ven todas las fotos';
   @override String get limitedAccessBody => 'CleanFotos solo puede ver las fotos que seleccionaste. Abre Ajustes y pon "Fotos y videos" en Permitir todo.';
   @override String get notNow => 'Ahora no';
+  @override String get pendingTitle => 'Termina la limpieza';
+  @override String pendingBody(int n) => 'Marcaste $n elemento(s) para borrar la última vez pero no lo confirmaste. ¿Borrarlos ahora?';
+  @override String get pendingConfirm => 'Borrarlos';
+  @override String get pendingLater => 'Conservarlos';
   @override String get errorMessage => 'Algo salió mal';
   @override String get retry => 'Reintentar';
   @override String get settings => 'Ajustes';
@@ -330,6 +342,10 @@ class _GermanStrings extends AppStrings {
   @override String get limitedAccessTitle => 'Nicht alle Fotos sichtbar';
   @override String get limitedAccessBody => 'CleanFotos sieht nur die von dir ausgewählten Fotos. Öffne die Einstellungen und stelle „Fotos und Videos" auf Alle zulassen.';
   @override String get notNow => 'Nicht jetzt';
+  @override String get pendingTitle => 'Aufräumen abschließen';
+  @override String pendingBody(int n) => 'Du hast beim letzten Mal $n Element(e) zum Löschen markiert, es aber nicht bestätigt. Jetzt löschen?';
+  @override String get pendingConfirm => 'Löschen';
+  @override String get pendingLater => 'Behalten';
   @override String get errorMessage => 'Etwas ist schiefgelaufen';
   @override String get retry => 'Erneut versuchen';
   @override String get settings => 'Einstellungen';
@@ -433,6 +449,10 @@ class _FrenchStrings extends AppStrings {
   @override String get limitedAccessTitle => 'Toutes les photos ne sont pas visibles';
   @override String get limitedAccessBody => 'CleanFotos ne voit que les photos que vous avez sélectionnées. Ouvrez les Paramètres et réglez « Photos et vidéos » sur Tout autoriser.';
   @override String get notNow => 'Pas maintenant';
+  @override String get pendingTitle => 'Terminer le nettoyage';
+  @override String pendingBody(int n) => 'Vous aviez marqué $n élément(s) à supprimer sans confirmer. Les supprimer maintenant ?';
+  @override String get pendingConfirm => 'Supprimer';
+  @override String get pendingLater => 'Conserver';
   @override String get errorMessage => 'Une erreur s\'est produite';
   @override String get retry => 'Réessayer';
   @override String get settings => 'Paramètres';
@@ -536,6 +556,10 @@ class _PortugueseStrings extends AppStrings {
   @override String get limitedAccessTitle => 'Nem todas as fotos estão visíveis';
   @override String get limitedAccessBody => 'O CleanFotos só vê as fotos que você selecionou. Abra as Configurações e defina "Fotos e vídeos" como Permitir tudo.';
   @override String get notNow => 'Agora não';
+  @override String get pendingTitle => 'Concluir a limpeza';
+  @override String pendingBody(int n) => 'Você marcou $n item(ns) para excluir da última vez, mas não confirmou. Excluir agora?';
+  @override String get pendingConfirm => 'Excluir';
+  @override String get pendingLater => 'Manter';
   @override String get errorMessage => 'Algo deu errado';
   @override String get retry => 'Tentar novamente';
   @override String get settings => 'Configurações';
@@ -639,6 +663,10 @@ class _ItalianStrings extends AppStrings {
   @override String get limitedAccessTitle => 'Non tutte le foto sono visibili';
   @override String get limitedAccessBody => 'CleanFotos vede solo le foto che hai selezionato. Apri le Impostazioni e imposta "Foto e video" su Consenti tutto.';
   @override String get notNow => 'Non ora';
+  @override String get pendingTitle => 'Completa la pulizia';
+  @override String pendingBody(int n) => 'Hai contrassegnato $n elemento/i da eliminare l\'ultima volta senza confermare. Eliminarli ora?';
+  @override String get pendingConfirm => 'Elimina';
+  @override String get pendingLater => 'Mantieni';
   @override String get errorMessage => 'Qualcosa è andato storto';
   @override String get retry => 'Riprova';
   @override String get settings => 'Impostazioni';
@@ -742,6 +770,10 @@ class _PolishStrings extends AppStrings {
   @override String get limitedAccessTitle => 'Nie wszystkie zdjęcia są widoczne';
   @override String get limitedAccessBody => 'CleanFotos widzi tylko wybrane przez Ciebie zdjęcia. Otwórz Ustawienia i ustaw „Zdjęcia i wideo" na Zezwól na wszystkie.';
   @override String get notNow => 'Nie teraz';
+  @override String get pendingTitle => 'Dokończ porządki';
+  @override String pendingBody(int n) => 'Ostatnio oznaczono $n element(ów) do usunięcia, ale bez potwierdzenia. Usunąć teraz?';
+  @override String get pendingConfirm => 'Usuń';
+  @override String get pendingLater => 'Zachowaj';
   @override String get errorMessage => 'Coś poszło nie tak';
   @override String get deleteFailed => 'Nie usunięto zdjęć. Sprawdź, czy CleanFotos ma pełny dostęp do zdjęć w Ustawieniach.';
   @override String get retry => 'Spróbuj ponownie';

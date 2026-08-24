@@ -1,5 +1,7 @@
 import 'dart:io' show Platform;
 
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -61,9 +63,8 @@ class _VideoGroupReviewScreenState extends State<VideoGroupReviewScreen> {
   final GlobalKey<CelebrationOverlayState> _celebrationKey =
       GlobalKey<CelebrationOverlayState>();
 
-  /// Marked across ALL groups, deleted in one batch when leaving.
-  final List<AssetEntity> _pendingDelete = [];
-  bool _deletionsCommitted = false;
+  /// True while the single end-of-session delete is running.
+  bool _isCommitting = false;
 
   final ScrollController _scroll = ScrollController();
   double _overscroll = 0;
@@ -169,8 +170,12 @@ class _VideoGroupReviewScreenState extends State<VideoGroupReviewScreen> {
         _videos.where((a) => _selectedIds.contains(a.id)).toList();
     if (picked.isEmpty) return;
 
-    _pendingDelete.addAll(picked);
-    final s = AppStrings.of(context.read<AppProvider>().languageCode);
+    // Persist the marks immediately. The OS confirmation can only be shown by
+    // a foreground app, so if the user force-quits mid-session we finish the
+    // job on next launch instead of silently losing their work.
+    final provider = context.read<AppProvider>();
+    unawaited(provider.queueForDeletion(picked));
+    final s = AppStrings.of(provider.languageCode);
     _celebrationKey.currentState?.celebrate(
         s.freedLabel(_formatBytes(picked.length * kAvgVideoBytes)));
 
@@ -181,13 +186,12 @@ class _VideoGroupReviewScreenState extends State<VideoGroupReviewScreen> {
     });
   }
 
+  /// Delete everything marked this session — one system prompt, on exit.
   Future<void> _commitDeletions() async {
-    if (_deletionsCommitted || _pendingDelete.isEmpty) return;
-    _deletionsCommitted = true;
-    final provider = context.read<AppProvider>();
-    final batch = List<AssetEntity>.from(_pendingDelete);
-    _pendingDelete.clear();
-    await provider.deleteAssets(batch);
+    if (_isCommitting) return;
+    _isCommitting = true;
+    await context.read<AppProvider>().flushPendingDeletions();
+    _isCommitting = false;
   }
 
   Future<void> _exit() async {

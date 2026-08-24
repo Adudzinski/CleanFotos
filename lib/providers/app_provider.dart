@@ -66,6 +66,7 @@ class AppProvider extends ChangeNotifier {
     isPro = prefs.getBool('is_pro') ?? false;
     onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
     themePref = prefs.getString('theme_pref') ?? 'system';
+    await _loadPendingDeletions();
     notifyListeners();
 
     // Only gather ad consent / initialize ads for non-Pro users. Pro users get
@@ -319,6 +320,102 @@ class AppProvider extends ChangeNotifier {
       state = AppState.error;
     }
     notifyListeners();
+  }
+
+  // ─── Pending deletions (survive the app being closed) ─────────────────────
+  //
+  // The OS confirmation for deleting media can only be shown by a FOREGROUND
+  // app — it can't be pre-granted, and can't be asked once the user has quit.
+  // The group modes therefore mark items as they go and commit them in one
+  // dialog on exit.
+  //
+  // If the app dies before that, the marks would be lost silently (nothing is
+  // deleted — safe, but the user was already shown "freed"). So we persist the
+  // marked ids and offer to finish the job next launch.
+  static const String _kPendingDeleteIds = 'pending_delete_ids';
+  List<String> _pendingDeleteIds = [];
+
+  /// Guards against two flushes running at once — e.g. app start and the
+  /// resume callback both firing, which would stack two system dialogs.
+  bool _isFlushing = false;
+
+  bool get hasPendingDeletions => _pendingDeleteIds.isNotEmpty;
+  int get pendingDeleteCount => _pendingDeleteIds.length;
+
+  /// Remember items marked for deletion so a crash/force-quit can't lose them.
+  ///
+  /// [notify] is opt-out for the swipe decks, which call this once per swipe:
+  /// they already rebuild via setState, and nothing on screen reads the pending
+  /// count, so an extra notifyListeners() would just double their rebuilds
+  /// during a gesture.
+  Future<void> queueForDeletion(List<AssetEntity> assets,
+      {bool notify = true}) async {
+    if (assets.isEmpty) return;
+    // De-duplicate: re-marking the same asset must not queue it twice.
+    final seen = _pendingDeleteIds.toSet();
+    for (final a in assets) {
+      if (seen.add(a.id)) _pendingDeleteIds.add(a.id);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kPendingDeleteIds, _pendingDeleteIds);
+    if (notify) notifyListeners();
+  }
+
+  Future<void> _clearPendingDeletions() async {
+    _pendingDeleteIds = [];
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kPendingDeleteIds);
+    notifyListeners();
+  }
+
+  /// Forget the marks without deleting — used when the user answers "keep
+  /// them", so we never nag about the same items again.
+  Future<void> discardPendingDeletions() => _clearPendingDeletions();
+
+  /// Delete everything currently marked, in a single system prompt.
+  /// Safe to call when nothing is pending, and safe to call twice.
+  Future<int> flushPendingDeletions() async {
+    if (_isFlushing || _pendingDeleteIds.isEmpty) return 0;
+    _isFlushing = true;
+    try {
+      final ids = List<String>.from(_pendingDeleteIds);
+      // Resolve ids back to assets. Anything already gone (deleted elsewhere,
+      // moved, or on a detached SD card) resolves to null and is skipped.
+      final assets = <AssetEntity>[];
+      for (final id in ids) {
+        try {
+          final a = await AssetEntity.fromId(id);
+          if (a != null) assets.add(a);
+        } catch (_) {/* unreadable id — drop it */}
+      }
+      if (assets.isEmpty) {
+        // Nothing left to delete (already gone) — drop the marks.
+        await _clearPendingDeletions();
+        return 0;
+      }
+
+      final freed = await deleteAssets(assets);
+
+      // Clear only once deleteAssets has RETURNED. Returning means the user
+      // actually answered the system prompt — allow or deny — and either way
+      // one answer is final, so we must not nag on every launch.
+      //
+      // Crucially, if the app is killed while that prompt is on screen (the
+      // user walks away, the OS reclaims us, they swipe the app away) we never
+      // reach this line, so the marks stay on disk and Home can offer to
+      // finish the job next launch. Clearing before the prompt would have
+      // thrown the marks away in exactly the case they're needed.
+      await _clearPendingDeletions();
+      return freed;
+    } finally {
+      _isFlushing = false;
+    }
+  }
+
+  /// Restore anything left marked by a previous session.
+  Future<void> _loadPendingDeletions() async {
+    final prefs = await SharedPreferences.getInstance();
+    _pendingDeleteIds = prefs.getStringList(_kPendingDeleteIds) ?? [];
   }
 
   // ─── Delete ───────────────────────────────────────────────────────────────

@@ -8,8 +8,15 @@ import '../services/review_service.dart';
 import '../theme/app_theme.dart';
 import '../l10n/strings.dart';
 
+// The website path moved from /cleanpics/ to /cleanfotos/. The old paths are
+// still served (Firebase rewrite, HTTP 200) so already-installed builds keep
+// working, but new builds must use the real path — Google Play's Data safety
+// checker requires a direct 200 and does not follow redirects.
 const String kPrivacyPolicyUrl =
-    'https://crocodata.net/cleanpics/privacy-policy.html';
+    'https://crocodata.net/cleanfotos/privacy-policy.html';
+const String kDeleteDataUrl = 'https://crocodata.net/cleanfotos/delete-data.html';
+const String kTermsUrl = 'https://crocodata.net/cleanfotos/terms.html';
+const String kContactEmail = 'contact@crocodata.net';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});

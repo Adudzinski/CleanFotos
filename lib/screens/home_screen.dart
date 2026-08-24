@@ -59,8 +59,10 @@ class _HomeScreenState extends State<HomeScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppProvider>().prepare();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<AppProvider>();
+      await provider.prepare();
+      if (mounted) await _offerPendingCleanup(provider);
     });
   }
 
@@ -80,6 +82,59 @@ class _HomeScreenState extends State<HomeScreen>
     final provider = context.read<AppProvider>();
     if (provider.state == AppState.permissionDenied) {
       provider.prepare();
+    }
+    // Returning from the background is another chance to finish deletions that
+    // were marked but never confirmed.
+    _offerPendingCleanup(provider);
+  }
+
+  /// True while the "finish your cleanup" dialog is on screen, so a resume
+  /// event can't stack a second copy of it.
+  bool _askingPending = false;
+
+  /// If a previous session marked items but never got to confirm (app closed,
+  /// killed, or backgrounded), explain that before firing the system delete
+  /// dialog — an unexplained "Delete 12 photos?" on launch is alarming.
+  Future<void> _offerPendingCleanup(AppProvider provider) async {
+    if (_askingPending || !mounted) return;
+    if (!provider.hasPendingDeletions) return;
+    // Deleting needs photo access; don't ask while permission is missing.
+    if (provider.state != AppState.ready) return;
+    // Only ask when Home is actually on top. Backgrounding the app *during* a
+    // cleanup session would otherwise pop this dialog over the group screen
+    // the user is still working in.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
+
+    _askingPending = true;
+    try {
+      final s = AppStrings.of(provider.languageCode);
+      final count = provider.pendingDeleteCount;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(s.pendingTitle),
+          content: Text(s.pendingBody(count)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(s.pendingLater),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(s.pendingConfirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await provider.flushPendingDeletions();
+      } else if (confirmed == false) {
+        // "Keep them" is an explicit answer — drop the marks so we don't ask
+        // again on every launch.
+        await provider.discardPendingDeletions();
+      }
+    } finally {
+      _askingPending = false;
     }
   }
 
