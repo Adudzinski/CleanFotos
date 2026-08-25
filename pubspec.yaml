@@ -57,7 +57,9 @@ dependencies:
   image: ^4.2.0
 
   # Utilities
-  intl: 0.20.2
+  # intl is intentionally NOT pinned here: nothing in lib/ imports it, and
+  # flutter_localizations already depends on it. Pinning an exact version only
+  # breaks CI whenever the Flutter SDK bumps its own intl constraint.
   crypto: ^3.0.3
   path_provider: ^2.1.4
   collection: ^1.18.0
