@@ -8,6 +8,10 @@ import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 import 'theme/noir.dart';
 
+/// Largest text scale the layouts are built and tested for (was 1.4 before
+/// 1.3). Above it text stops growing rather than breaking the screens.
+const double kMaxTextScale = 2.0;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -71,14 +75,15 @@ class _CleanFotosAppState extends State<CleanFotosApp> {
         themeMode: ThemeMode.dark,
         home: const HomeScreen(),
         builder: (context, child) {
-          // Respect the user's OS font-size setting (helps low-vision
-          // users), but never shrink below our design and cap the max so
-          // layouts don't break.
+          // Respect the user's OS text size — low-vision users rely on it.
+          // Never below our design size; up to 2x (Android's largest, and
+          // well into iOS's accessibility "Larger Text" range). Every screen
+          // is checked at 2x: see kMaxTextScale.
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
                 textScaler: MediaQuery.of(context)
                     .textScaler
-                    .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.4)),
+                    .clamp(minScaleFactor: 1.0, maxScaleFactor: kMaxTextScale)),
             child: child!,
           );
         },

@@ -128,8 +128,10 @@ class NoirHeader extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Two lines, so big accessibility text wraps instead of
+              // cutting the title off.
               Text(title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: NoirText.bar),

@@ -710,16 +710,24 @@ class _HomeScreenState extends State<HomeScreen>
           last == null ? 0 : DateTime.now().difference(last).inMinutes;
       text = minutes < 1 ? s.upToDate : s.checkedAgo(minutes);
     }
-    final dot = Container(
-      width: 8,
-      height: 8,
-      decoration:
-          const BoxDecoration(color: Noir.accent, shape: BoxShape.circle),
+    // Centred on the first text line, whatever the text size.
+    final dot = SizedBox(
+      height: MediaQuery.textScalerOf(context).scale(14) * 1.3,
+      child: Center(
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration:
+              const BoxDecoration(color: Noir.accent, shape: BoxShape.circle),
+        ),
+      ),
     );
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     return Semantics(
       liveRegion: true,
       child: Row(
+        // Top-aligned so the dot stays by the first line when big text wraps.
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (provider.isRescanning && !reduceMotion)
             FadeTransition(
