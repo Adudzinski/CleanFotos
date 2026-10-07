@@ -13,7 +13,7 @@ void main() {
         s.homeTitle, s.tabPhotos('1'), s.tabVideos('2'), s.videosLabel,
         s.upToDate, s.checkedAgo(3), s.lookingForNew,
         s.similarShots, s.similarShotsDesc, s.similarClips, s.similarClipsDesc,
-        s.oneByOne, s.oneByOnePhotosDesc, s.oneByOneVideosDesc,
+        s.swipe, s.swipePhotosDesc, s.swipeVideosDesc,
         s.findingGroups, s.allowAccess, s.selectMorePhotos,
         s.limitedAccessBodyIos, s.nextMilestone, s.toGo('1 MB'),
         s.ofFreed('1 MB'), s.firstMilestone('100 MB'),

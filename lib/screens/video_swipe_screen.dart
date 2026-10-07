@@ -3,7 +3,7 @@ import 'package:photo_manager/photo_manager.dart';
 import '../models/delete_result.dart';
 import 'swipe_screen.dart';
 
-/// "One by one" for videos — the same deck as photos, with hold-to-play on
+/// "Swipe" for videos — the same deck as photos, with hold-to-play on
 /// the current card (REDESIGN_1.3_PLAN.md §5.3, video variant).
 class VideoSwipeScreen extends StatelessWidget {
   final List<AssetEntity> videos;

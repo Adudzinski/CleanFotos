@@ -95,9 +95,12 @@ same items. The fallback now only runs when `deleteWithIds` genuinely *threw*.
 - iOS `BouncingScrollPhysics` → *moves* past the edge, emits almost no
   overscroll notifications.
 
-(1.2's overscroll group navigation had to handle both. It was removed on
-purpose in 1.3 — explicit buttons instead. Keep this in mind if a gesture like
-it ever comes back.)
+Overscroll-to-change-group (Similar shots/clips) must handle **both**: measure
+`metrics.pixels` beyond `min/maxScrollExtent` (iOS) *and* accumulate
+`OverscrollNotification` (Android). iOS also springs back through the same
+out-of-range positions, so a `_navLock` prevents a double trigger on the
+rebound. (The 1.3 plan dropped this gesture; Alexandra wanted it back, so it
+now works alongside the Next/Previous buttons.)
 
 ### `VideoPlayerController.contentUri` is Android-only
 On iOS `getMediaUrl()` returns a file URL and `contentUri` fails silently. Use
@@ -194,16 +197,17 @@ Home has a Photos / Videos tab; each has two modes.
 
 | Mode | Interaction |
 |---|---|
-| Similar shots / Similar clips | grid of one time-group, tap to mark; "Delete n · Next" / "Keep all · Next" / Previous; hold a video tile to play inline, hold a photo for the viewer |
-| One by one (photos / videos) | card deck, Delete / Keep buttons or swipe, Undo (50 steps), hold to play videos |
+| Similar shots / Similar clips | grid of one time-group, tap to mark; "Delete n · Next" / "Keep all · Next" / Previous, **or pull past the bottom/top of the grid** for next/previous; hold a video tile to play inline, hold a photo for the viewer |
+| Swipe (photos / videos) | card deck, Delete / Keep buttons or swipe, Undo (50 steps), hold to play videos. (The plan called it "One by one"; renamed to "Swipe" — everyone knows the word.) |
 
 Noir is **dark-only**. Colour has fixed jobs: the logo's purple
 (`Noir.accent`, `accentStrong` behind white text) = primary actions, selected
 tab, progress; green `Noir.success` = the Finished check and KEEP only; red
 `Noir.danger` = delete only; gold `Noir.reward` = milestones only. (The plan
-had white as the accent; Alexandra found it too plain, so purple came back.) Confetti, overscroll
-navigation, idle hints and the Home coachmark tour were **removed on purpose**
-in 1.3 — don't bring them back without a decision.
+had white as the accent; Alexandra found it too plain, so purple came back.) Confetti, idle hints and
+the Home coachmark tour were **removed on purpose** in 1.3 — don't bring them
+back without a decision. (Overscroll navigation was removed too, then restored
+at Alexandra's request.)
 
 ---
 

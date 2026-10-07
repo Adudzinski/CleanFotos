@@ -21,10 +21,10 @@ import 'session.dart';
 /// "Similar shots" / "Similar clips" — one time-group at a time; tap the
 /// items you don't want (REDESIGN_1.3_PLAN.md §5.4).
 ///
-/// Navigation is explicit: "Keep all · Next" / "Delete n · Next" and a
-/// Previous button. (The overscroll navigation and idle hints of 1.2 were
-/// removed on purpose.) Marks go into the provider's persisted queue when the
-/// user moves on, and everything is deleted in ONE system prompt at Finish.
+/// Two ways to move between groups: the buttons ("Keep all · Next" /
+/// "Delete n · Next", Previous) or pulling past the bottom / top of the grid,
+/// as in 1.2. Marks go into the provider's persisted queue when the user
+/// moves on, and everything is deleted in ONE system prompt at Finish.
 class GroupReviewScreen extends StatefulWidget {
   final List<PhotoGroup> groups;
   final int startIndex;
@@ -55,6 +55,15 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   bool get _isLast => _index >= _groups.length - 1;
 
   final ScrollController _scroll = ScrollController();
+
+  /// How far the user has pulled past either end of the grid.
+  double _overscroll = 0;
+
+  /// Guards against the iOS bounce re-triggering navigation.
+  bool _navLock = false;
+
+  /// How far past the edge you must pull to flip to the next/previous group.
+  static const double _kOverscrollTrigger = 90;
 
   // ── Hold-to-play (videos), inline in the tile ────────────────────────────
   // One player at a time, built on long-press and torn down on release, so
@@ -87,6 +96,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     _selected
       ..clear()
       ..addAll(_group.assets.where((a) => _provider.isQueued(a.id)).map((a) => a.id));
+    _overscroll = 0;
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
@@ -156,6 +166,50 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       _index--;
       _loadGroup();
     });
+  }
+
+  /// Turn a pull past either end of the grid into group navigation — past
+  /// the bottom = Next (same as the main button), past the top = Previous.
+  /// Must handle BOTH scroll physics:
+  ///
+  ///  • Android (ClampingScrollPhysics) never scrolls past the edge and instead
+  ///    reports OverscrollNotification deltas.
+  ///  • iOS (BouncingScrollPhysics) lets the position travel beyond the edge
+  ///    and emits almost no overscroll notifications — so we measure how far
+  ///    past the extent we are instead. iOS also springs back through the
+  ///    same out-of-range positions, hence [_navLock].
+  bool _onScrollNotification(ScrollNotification n) {
+    if (n is ScrollEndNotification) {
+      _overscroll = 0;
+      _navLock = false;
+      return false;
+    }
+    if (_navLock || _finishing) return false;
+
+    final m = n.metrics;
+    double past = 0;
+    if (m.pixels > m.maxScrollExtent) {
+      past = m.pixels - m.maxScrollExtent;
+    } else if (m.pixels < m.minScrollExtent) {
+      past = m.pixels - m.minScrollExtent;
+    }
+
+    if (past != 0) {
+      _overscroll = past; // iOS: absolute overshoot
+    } else if (n is OverscrollNotification) {
+      _overscroll += n.overscroll; // Android: accumulated deltas
+    }
+
+    if (_overscroll > _kOverscrollTrigger) {
+      _overscroll = 0;
+      _navLock = true; // don't re-fire while the bounce settles
+      _next();
+    } else if (_overscroll < -_kOverscrollTrigger) {
+      _overscroll = 0;
+      _navLock = true;
+      if (_index > 0) _previous();
+    }
+    return false;
   }
 
   /// The X / back button. What's marked in the current group counts too —
@@ -281,32 +335,38 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
                         .copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 12),
                 Expanded(
-                  child: GridView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.only(bottom: 16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _onScrollNotification,
+                    child: GridView.builder(
+                      controller: _scroll,
+                      // Always scrollable, so the pull exists even when the
+                      // group is too small to fill the screen.
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 16),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                      ),
+                      itemCount: n,
+                      itemBuilder: (context, i) {
+                        final asset = group.assets[i];
+                        final playing = _playingId == asset.id;
+                        return _Tile(
+                          asset: asset,
+                          isVideo: _isVideo,
+                          marked: _selected.contains(asset.id),
+                          onTap: () => _toggle(asset),
+                          onHoldStart: _isVideo
+                              ? () => _startPlay(asset)
+                              : () => PhotoDetailDialog.show(context, asset),
+                          onHoldEnd: _isVideo ? _stopPlay : null,
+                          controller: playing && _playReady ? _playCtrl : null,
+                          loading: playing && !_playReady,
+                        );
+                      },
                     ),
-                    itemCount: n,
-                    itemBuilder: (context, i) {
-                      final asset = group.assets[i];
-                      final playing = _playingId == asset.id;
-                      return _Tile(
-                        asset: asset,
-                        isVideo: _isVideo,
-                        marked: _selected.contains(asset.id),
-                        onTap: () => _toggle(asset),
-                        onHoldStart: _isVideo
-                            ? () => _startPlay(asset)
-                            : () => PhotoDetailDialog.show(context, asset),
-                        onHoldEnd: _isVideo ? _stopPlay : null,
-                        controller: playing && _playReady ? _playCtrl : null,
-                        loading: playing && !_playReady,
-                      );
-                    },
                   ),
                 ),
                 Row(

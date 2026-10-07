@@ -20,7 +20,7 @@ import '../utils/video_utils.dart';
 import '../widgets/noir/noir_widgets.dart';
 import 'session.dart';
 
-/// "One by one" — every photo (or video), newest first, one card at a time
+/// "Swipe" — every photo (or video), newest first, one card at a time
 /// (REDESIGN_1.3_PLAN.md §5.3).
 ///
 /// Swipe left / Delete marks the item; right / Keep moves on. Marks are
@@ -390,7 +390,7 @@ class _SwipeScreenState extends State<SwipeScreen>
                     semanticLabel: s.finish,
                     onPressed: _finish,
                   ),
-                  title: s.oneByOne,
+                  title: s.swipe,
                   subtitle: s.reviewed(formatCount(_reviewed, lang)),
                   trailing: NoirIconButton(
                     icon: Icons.undo_rounded,

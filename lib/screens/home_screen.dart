@@ -601,8 +601,8 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const SizedBox(height: Noir.gapS),
                     _modeCard(
-                      title: s.oneByOne,
-                      desc: s.oneByOnePhotosDesc,
+                      title: s.swipe,
+                      desc: s.swipePhotosDesc,
                       meta: s.photosCount(provider.stats.totalPhotos,
                           formatCount(provider.stats.totalPhotos, lang)),
                       thumbs: provider.allPhotos.isNotEmpty
@@ -628,8 +628,8 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     const SizedBox(height: Noir.gapS),
                     _modeCard(
-                      title: s.oneByOne,
-                      desc: s.oneByOneVideosDesc,
+                      title: s.swipe,
+                      desc: s.swipeVideosDesc,
                       meta: videoAccessDenied
                           ? s.allowAccess
                           : s.videosCount(provider.videoCount,

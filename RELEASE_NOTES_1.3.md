@@ -49,15 +49,16 @@ A brand-new CleanFotos.
 - Dark-only theme, Geist font (bundled), new tokens and shared widgets.
 - New Home: freshness line, Photos/Videos tabs with counts, two mode cards
   ("Similar shots/clips", "One by one"), next-milestone card.
-- No confetti, no coachmark tour, no overscroll navigation, no idle hints.
+- No confetti, no coachmark tour, no idle hints.
 
 ### Modes
-- **One by one** (photos and videos): Delete / Keep buttons, swipe still
+- **Swipe** (photos and videos): Delete / Keep buttons, swipe still
   works, **Undo** (up to 50 steps), "3 marked · ~11 MB" pill, one-time swipe
   hint, hold-to-play for videos.
 - **Similar shots / clips**: tap what you don't want, then "Delete n · Next"
-  or "Keep all · Next", with a Previous button. Going back shows what's
-  already marked.
+  or "Keep all · Next", with a Previous button — or pull past the bottom/top
+  of the grid for the next/previous group, as in 1.2. Going back shows
+  what's already marked.
 
 ### Honest results
 - **Finished** screen after the system prompt: real freed size, wording that
