@@ -7,7 +7,7 @@ import 'noir.dart';
 /// kept so older call sites still compile, and simply return the Noir values.
 /// New code should use [Noir] / [NoirText] directly.
 class AppTheme {
-  static const Color primary = Noir.accent;
+  static const Color primary = Noir.accentStrong;
   static const Color primaryDark = Noir.text;
   static const Color secondary = Noir.muted;
   static const Color success = Color(0xFF43D17A);
@@ -36,10 +36,10 @@ class AppTheme {
       brightness: Brightness.dark,
       fontFamily: NoirText.family,
       colorScheme: const ColorScheme.dark(
-        primary: Noir.accent,
+        primary: Noir.accentStrong,
         onPrimary: Noir.onAccent,
         secondary: Noir.muted,
-        onSecondary: Noir.onAccent,
+        onSecondary: Noir.bg,
         surface: Noir.surface,
         onSurface: Noir.text,
         error: Noir.danger,
@@ -72,7 +72,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Noir.accent,
+          backgroundColor: Noir.accentStrong,
           foregroundColor: Noir.onAccent,
           minimumSize: const Size(64, 52),
           shape: pill,
@@ -130,11 +130,11 @@ class AppTheme {
         thumbColor: const WidgetStatePropertyAll(Colors.white),
         trackColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
-                ? const Color(0xFF3F3F46)
+                ? Noir.accent
                 : Noir.surface2),
         trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
-                ? Colors.white
+                ? Colors.transparent
                 : Noir.line),
       ),
       cardTheme: CardThemeData(

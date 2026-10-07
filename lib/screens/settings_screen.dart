@@ -180,7 +180,7 @@ class SettingsScreen extends StatelessWidget {
               bold: provider.languageCode == languages[i].$1,
               trailing: provider.languageCode == languages[i].$1
                   ? const Icon(Icons.check_rounded,
-                      size: 20, color: Noir.text)
+                      size: 20, color: Noir.accent)
                   : null,
               onTap: () {
                 FeedbackService.instance.play(Fx.tap);

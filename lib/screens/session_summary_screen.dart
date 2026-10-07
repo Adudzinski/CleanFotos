@@ -142,8 +142,8 @@ class _SessionSummaryScreenState extends State<SessionSummaryScreen>
       children: [
         const Spacer(),
         _circle(
-          color: Noir.accent,
-          child: const Icon(Icons.check_rounded, size: 40, color: Noir.onAccent),
+          color: Noir.success,
+          child: const Icon(Icons.check_rounded, size: 44, color: Noir.bg),
         ),
         const SizedBox(height: 24),
         AnimatedBuilder(

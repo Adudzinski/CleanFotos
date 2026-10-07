@@ -128,7 +128,8 @@ class NoirButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
     final (Color bg, Color fg, BorderSide side) = switch (variant) {
-      NoirButtonVariant.primary => (Noir.accent, Noir.onAccent, BorderSide.none),
+      NoirButtonVariant.primary =>
+        (Noir.accentStrong, Noir.onAccent, BorderSide.none),
       NoirButtonVariant.danger => (Noir.danger, Colors.white, BorderSide.none),
       NoirButtonVariant.secondary => (
           Noir.surface2,

@@ -155,7 +155,7 @@ class _SwipeScreenState extends State<SwipeScreen>
         cornerRadius: 16,
         callToActionTextStyle: NativeTemplateTextStyle(
           textColor: Noir.onAccent,
-          backgroundColor: Noir.accent,
+          backgroundColor: Noir.accentStrong,
           style: NativeTemplateFontStyle.bold,
           size: 16,
         ),
@@ -552,7 +552,7 @@ class _SwipeScreenState extends State<SwipeScreen>
           _decisionOverlay(s.swipeDelete.toUpperCase(), Noir.danger,
               deleteOpacity, Alignment.topRight, 0.25),
         if (keepOpacity > 0)
-          _decisionOverlay(s.swipeKeep.toUpperCase(), Noir.accent, keepOpacity,
+          _decisionOverlay(s.swipeKeep.toUpperCase(), Noir.success, keepOpacity,
               Alignment.topLeft, -0.25),
         // Date chip, bottom-left.
         Positioned(
@@ -612,7 +612,7 @@ class _SwipeScreenState extends State<SwipeScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: const ShapeDecoration(
-          color: Noir.accent,
+          color: Noir.accentStrong,
           shape: StadiumBorder(),
         ),
         child: Row(
@@ -636,8 +636,7 @@ class _SwipeScreenState extends State<SwipeScreen>
   Widget _decisionOverlay(String label, Color color, double opacity,
       Alignment align, double angle) {
     return Container(
-      color: (color == Noir.accent ? Colors.black : color)
-          .withValues(alpha: opacity * 0.35),
+      color: color.withValues(alpha: opacity * 0.3),
       alignment: align,
       padding: const EdgeInsets.all(28),
       child: Opacity(

@@ -40,7 +40,7 @@ class _ToastView extends StatelessWidget {
     final pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
       decoration: const ShapeDecoration(
-        color: Noir.accent,
+        color: Colors.white,
         shape: StadiumBorder(),
         shadows: [
           BoxShadow(
@@ -53,7 +53,7 @@ class _ToastView extends StatelessWidget {
           fontFamily: NoirText.family,
           fontSize: 15,
           fontWeight: FontWeight.w700,
-          color: Noir.onAccent,
+          color: Noir.bg,
         ),
       ),
     );

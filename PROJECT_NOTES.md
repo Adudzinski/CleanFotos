@@ -197,8 +197,11 @@ Home has a Photos / Videos tab; each has two modes.
 | Similar shots / Similar clips | grid of one time-group, tap to mark; "Delete n · Next" / "Keep all · Next" / Previous; hold a video tile to play inline, hold a photo for the viewer |
 | One by one (photos / videos) | card deck, Delete / Keep buttons or swipe, Undo (50 steps), hold to play videos |
 
-Noir is **dark-only**; colour is reserved: white = primary, red `Noir.danger` =
-delete only, gold `Noir.reward` = milestones only. Confetti, overscroll
+Noir is **dark-only**. Colour has fixed jobs: the logo's purple
+(`Noir.accent`, `accentStrong` behind white text) = primary actions, selected
+tab, progress; green `Noir.success` = the Finished check and KEEP only; red
+`Noir.danger` = delete only; gold `Noir.reward` = milestones only. (The plan
+had white as the accent; Alexandra found it too plain, so purple came back.) Confetti, overscroll
 navigation, idle hints and the Home coachmark tour were **removed on purpose**
 in 1.3 — don't bring them back without a decision.
 

@@ -22,9 +22,18 @@ class Noir {
   /// 8% white hairline.
   static const line = Color(0x14FFFFFF);
 
-  /// Primary buttons, selected tab, progress.
-  static const accent = Color(0xFFFFFFFF);
-  static const onAccent = Color(0xFF0A0A0C);
+  /// Brand purple (the logo's): progress bars, dots, rings, spinners,
+  /// switches — anything that isn't a fill behind text.
+  static const accent = Color(0xFF6C63FF);
+
+  /// Slightly deeper purple for fills behind white text (primary buttons,
+  /// the selected tab): white on it is 5.4:1, on [accent] only 4.3:1.
+  static const accentStrong = Color(0xFF5B52F0);
+  static const onAccent = Color(0xFFFFFFFF);
+
+  /// The logo's green check — the Finished screen's check and the KEEP
+  /// swipe label only.
+  static const success = Color(0xFF43D17A);
 
   /// Delete only. White text on it = 4.7:1.
   static const danger = Color(0xFFD63A2C);

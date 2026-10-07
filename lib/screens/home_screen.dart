@@ -361,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: Noir.accent,
+              backgroundColor: Noir.accentStrong,
               foregroundColor: Noir.onAccent,
               shape: const StadiumBorder(),
             ),

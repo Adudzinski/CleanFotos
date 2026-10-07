@@ -33,7 +33,7 @@ class NoirCard extends StatelessWidget {
   }
 }
 
-/// Two (or more) pill tabs in a `surface2` track. Selected = white on black.
+/// Two (or more) pill tabs in a `surface2` track. Selected = white on purple.
 class NoirSegmented extends StatelessWidget {
   final List<String> labels;
   final int selectedIndex;
@@ -73,7 +73,7 @@ class NoirSegmented extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     decoration: ShapeDecoration(
                       color: i == selectedIndex
-                          ? Noir.accent
+                          ? Noir.accentStrong
                           : Colors.transparent,
                       shape: const StadiumBorder(),
                     ),
