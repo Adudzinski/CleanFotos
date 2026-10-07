@@ -667,15 +667,13 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildHeader(AppStrings s) {
     return Row(
       children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: Noir.accent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(Icons.check_rounded,
-              size: 22, color: Noir.onAccent),
+        // The real app logo (transparent background), not a generic mark.
+        Image.asset(
+          'assets/icon/icon_header.png',
+          width: 40,
+          height: 40,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
         ),
         const SizedBox(width: 10),
         const Expanded(
