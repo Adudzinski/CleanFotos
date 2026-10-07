@@ -79,6 +79,8 @@ class _SwipeScreenState extends State<SwipeScreen>
   void initState() {
     super.initState();
     _provider = context.read<AppProvider>();
+    // Holds the background library re-scan back until we're done.
+    _provider.inCleanupSession = true;
     // Newest-in-library first (sorted in [AppProvider.ensurePhotos]).
     _queue = List.of(widget.photos);
 
@@ -118,6 +120,9 @@ class _SwipeScreenState extends State<SwipeScreen>
     if (!_deletionsCommitted && _pendingDelete.isNotEmpty) {
       _commitDeletions();
     }
+    // After the commit above: its flush is already under way, so the re-scan
+    // this releases waits for the delete instead of racing it.
+    _provider.inCleanupSession = false;
     _flyOut.dispose();
     _promote.dispose();
     _nativeAd?.dispose();

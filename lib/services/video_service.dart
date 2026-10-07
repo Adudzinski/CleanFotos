@@ -58,10 +58,11 @@ class VideoService {
 
   Future<void> openSettings() => openAppSettings();
 
-  Future<int> totalCount() async {
-    final videos = await loadAllVideos();
-    return videos.length;
-  }
+  /// Total number of videos — a single count query, without loading any.
+  Future<int> totalCount() => PhotoManager.getAssetCount(
+        type: RequestType.video,
+        filterOption: _newestFirstFilter,
+      );
 
   /// Every video once (deduped), sorted newest-in-library first.
   Future<List<AssetEntity>> loadAllVideos() async {

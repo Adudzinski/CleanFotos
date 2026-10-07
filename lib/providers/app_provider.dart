@@ -1,7 +1,8 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Timer, unawaited;
 import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodCall;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
@@ -36,7 +37,8 @@ class AppProvider extends ChangeNotifier {
   bool limitedAccess = false;
 
   /// All photos, newest-first — used by Picture Swipe (every photo, not just
-  /// duplicates). Loaded lazily and cached; cleared on Refresh.
+  /// duplicates). Loaded lazily, cached, and re-scanned by [reloadLibrary]
+  /// whenever the library changes.
   List<AssetEntity> allPhotos = [];
   bool photosLoaded = false;
 
@@ -122,7 +124,7 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Resume cursors ─────────────────────────────────────────────────────
   // Each swipe/review mode remembers the timestamp of the card the user was on,
-  // so it resumes there next time. Refresh clears them → start at the newest.
+  // so it resumes there next time. (Since 1.3 Refresh no longer clears them.)
   static const String kPhotoCursor = 'cursor_photo';
   static const String kVideoCursor = 'cursor_video';
   static const String kGroupCursor = 'cursor_group';
@@ -191,6 +193,8 @@ class AppProvider extends ChangeNotifier {
       return;
     }
 
+    _registerChangeListener();
+
     try {
       _totalPhotos = await _service.totalCount();
       stats = _service.estimateStats(_totalPhotos, groups);
@@ -199,26 +203,188 @@ class AppProvider extends ChangeNotifier {
 
       // Warm the library up in the background so the first tap on a cleanup
       // mode doesn't sit on a spinner. Fire-and-forget: the home screen is
-      // already interactive, and ensurePhotos() is cached + idempotent.
-      unawaited(_warmUp());
+      // already interactive, and the scan is shared with anyone who asks for
+      // the library meanwhile (see [_freshen]). Failures are logged and the
+      // on-demand paths below still run.
+      unawaited(reloadLibrary());
     } catch (e) {
       state = AppState.error;
       notifyListeners();
     }
   }
 
-  /// Load every photo, newest-first — on demand, cached. Used by Picture Swipe.
-  /// Pre-load the photo library (and then the groups) quietly in the
-  /// background after the home screen appears. Failures are ignored — the
-  /// on-demand path still runs if the user taps before this finishes.
-  Future<void> _warmUp() async {
+  // ─── Library freshness ────────────────────────────────────────────────────
+  //
+  // The scan is cached for the whole process lifetime, and iOS keeps the app
+  // alive in the background for days. Before 1.3 nothing ever invalidated it,
+  // so photos taken after the first launch didn't show up until the user found
+  // and tapped Refresh. Now we listen for library changes, re-check on resume,
+  // and re-scan quietly in the background — Home stays usable throughout.
+
+  /// When the library was last fully scanned. Null until the first scan.
+  DateTime? lastScanAt;
+
+  /// True while a background re-scan is running (for Home's freshness line).
+  bool isRescanning = false;
+
+  /// The library changed — or a re-scan was postponed — since the last scan.
+  bool _libraryStale = false;
+
+  /// Cheap summary of the library at the last scan; see
+  /// [PhotoService.libraryFingerprint].
+  String? _fingerprint;
+
+  bool _changeListenerRegistered = false;
+  Timer? _reloadTimer;
+  Future<void>? _reloadFuture;
+
+  bool _inCleanupSession = false;
+
+  /// True while a cleanup mode is open. Every mode sets it on enter and clears
+  /// it on exit. Re-scans are held back meanwhile — swapping the lists under a
+  /// running session would shift the user's place — and run once they're back
+  /// on Home.
+  ///
+  /// Setting it never notifies: modes set it from initState/dispose, where
+  /// rebuilding Home isn't allowed.
+  bool get inCleanupSession => _inCleanupSession;
+  set inCleanupSession(bool value) {
+    _inCleanupSession = value;
+    if (!value && _libraryStale) _scheduleReload(Duration.zero);
+  }
+
+  /// Listen for library changes (new photos, deletions in other apps, a
+  /// changed limited-access selection). Registered once per process — it lives
+  /// as long as the provider, so it's never removed.
+  void _registerChangeListener() {
+    if (_changeListenerRegistered) return;
+    _changeListenerRegistered = true;
+    PhotoManager.addChangeCallback(_onLibraryChanged);
+    unawaited(PhotoManager.startChangeNotify());
+  }
+
+  void _onLibraryChanged(MethodCall call) {
+    _libraryStale = true;
+    // Videos aren't part of the photo scan and are re-read every time a video
+    // mode opens; only their grouping is cached, so just drop it.
+    videoGroupsLoaded = false;
+    // Changes arrive in bursts (a burst shot, an iCloud sync) — wait for quiet.
+    _scheduleReload(const Duration(milliseconds: 1500));
+  }
+
+  void _scheduleReload(Duration delay) {
+    _reloadTimer?.cancel();
+    _reloadTimer = Timer(delay, () => unawaited(reloadLibrary()));
+  }
+
+  /// Called by Home when the app comes back to the foreground.
+  Future<void> onAppResumed() async {
+    if (state != AppState.ready) return;
+    // The user may have changed the access level in Settings meanwhile —
+    // granting full access doesn't restart the app.
+    await _refreshAccessLevel();
+    final last = lastScanAt;
+    final old = last == null ||
+        DateTime.now().difference(last) > const Duration(seconds: 60);
+    if (_libraryStale || old) await reloadLibrary();
+  }
+
+  /// Re-scan the library and regroup, without ever putting Home into the
+  /// loading state.
+  ///
+  /// [silent] (the default) is for automatic triggers — change events,
+  /// resume, opening a mode. It first compares a cheap fingerprint with the
+  /// last scan and skips the full scan when the photos didn't change: iOS
+  /// reports a "change" for every iCloud sync batch and edit, and re-reading
+  /// 20k+ assets each time would drain the battery. Pass `silent: false` when
+  /// the user explicitly asked to look again (pull-to-refresh) to always scan.
+  ///
+  /// Postponed (marked stale) while a cleanup mode is open or a deletion is
+  /// running; one scan runs at a time and concurrent callers share it.
+  Future<void> reloadLibrary({bool silent = true}) {
+    if (_inCleanupSession || _isFlushing) {
+      _libraryStale = true;
+      return Future<void>.value();
+    }
+    return _reloadFuture ??=
+        _runReload(silent).whenComplete(() => _reloadFuture = null);
+  }
+
+  Future<void> _runReload(bool silent) async {
+    // Cleared up front so a change that lands DURING the scan re-marks it and
+    // triggers another pass afterwards.
+    _libraryStale = false;
+    var failed = false;
     try {
-      await ensurePhotos();
-      await ensureGroups();
+      final unchanged = silent &&
+          _fingerprint != null &&
+          await _service.libraryFingerprint() == _fingerprint;
+      if (!unchanged) {
+        isRescanning = true;
+        notifyListeners();
+
+        await _refreshAccessLevel();
+        await PhotoManager.releaseCache();
+        final all = await _service.loadAllAssets(); // newest first
+        final regrouped = await _service.groupAssets(all);
+        final fingerprint = await _service.libraryFingerprint();
+
+        allPhotos = all;
+        photosLoaded = true;
+        groups = regrouped;
+        groupsLoaded = true;
+        _totalPhotos = all.length;
+        stats = _service.estimateStats(_totalPhotos, groups);
+        // Video groups rebuild lazily from a fresh video list on next use.
+        videoGroups = [];
+        videoGroupsLoaded = false;
+        _fingerprint = fingerprint;
+      }
+      lastScanAt = DateTime.now();
+    } catch (e) {
+      failed = true;
+      // Leave it stale so the next resume / mode open tries again — but don't
+      // reschedule from here, or a persistent failure would loop.
+      _libraryStale = true;
+      debugPrint('reloadLibrary failed: $e');
+    } finally {
+      isRescanning = false;
+      notifyListeners();
+    }
+    if (!failed && _libraryStale) {
+      _scheduleReload(const Duration(milliseconds: 1500));
+    }
+  }
+
+  /// Re-read whether access is full or "Selected photos" only, without
+  /// prompting. Only revoking access restarts the app, so a change from
+  /// limited to full would otherwise go unnoticed until the next launch.
+  Future<void> _refreshAccessLevel() async {
+    try {
+      final ps = await PhotoManager.getPermissionState(
+          requestOption: const PermissionRequestOption());
+      if (ps != PermissionState.authorized && ps != PermissionState.limited) {
+        return;
+      }
+      final limited = ps == PermissionState.limited;
+      if (limited != limitedAccess) {
+        limitedAccess = limited;
+        notifyListeners();
+      }
     } catch (_) {}
   }
 
+  /// Wait for a scan in flight, and re-scan first if the library changed
+  /// since — so a mode never opens on a stale cache.
+  Future<void> _freshen() async {
+    final running = _reloadFuture;
+    if (running != null) await running;
+    if (_libraryStale) await reloadLibrary();
+  }
+
+  /// Load every photo, newest-first — on demand, cached. Used by Picture Swipe.
   Future<List<AssetEntity>> ensurePhotos() async {
+    await _freshen();
     if (photosLoaded && allPhotos.isNotEmpty) return allPhotos;
     await PhotoManager.releaseCache();
     allPhotos = await _service.loadAllAssets();
@@ -253,6 +419,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<List<PhotoGroup>> ensureGroups() async {
+    await _freshen();
     if (groupsLoaded) return groups;
 
     isLoadingGroups = true;
@@ -283,43 +450,19 @@ class AppProvider extends ChangeNotifier {
     return groups;
   }
 
-  /// Re-scan from scratch: clears caches, re-reads the library from MediaStore,
-  /// and re-groups. Always starts every mode at the newest items afterward.
+  /// Pull-to-refresh on Home — the hidden fallback for when the automatic
+  /// re-scan didn't pick something up. Re-checks access (it may have changed
+  /// in Settings), then always does a full scan. Home stays on screen: the
+  /// pull indicator is the progress, so we don't switch to the loading state.
   Future<void> refresh() async {
-    state = AppState.loading;
-    groups = [];
-    groupsLoaded = false;
-    videoGroups = [];
-    videoGroupsLoaded = false;
-    allPhotos = [];
-    photosLoaded = false;
-    await clearCursors();
-    notifyListeners();
-
     final granted = await _checkPermission();
     if (!granted) {
       state = AppState.permissionDenied;
       notifyListeners();
       return;
     }
-
-    try {
-      // Drop photo_manager's cached asset lists so we see deletions/additions.
-      await PhotoManager.releaseCache();
-
-      final all = await _service.loadAllAssets();
-      _totalPhotos = all.length;
-      allPhotos = all;
-      photosLoaded = true;
-      groups = await _service.groupAssets(all);
-      groupsLoaded = true;
-      stats = _service.estimateStats(_totalPhotos, groups);
-      state = AppState.ready;
-    } catch (e) {
-      debugPrint('refresh failed: $e');
-      state = AppState.error;
-    }
-    notifyListeners();
+    _registerChangeListener();
+    await reloadLibrary(silent: false);
   }
 
   // ─── Pending deletions (survive the app being closed) ─────────────────────
@@ -409,6 +552,9 @@ class AppProvider extends ChangeNotifier {
       return freed;
     } finally {
       _isFlushing = false;
+      // A re-scan postponed for the delete (the delete itself is a library
+      // change) runs now — unless a mode is still open; then it runs on exit.
+      if (_libraryStale && !_inCleanupSession) _scheduleReload(Duration.zero);
     }
   }
 

@@ -50,15 +50,22 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   /// How far past the edge you must pull to flip to the next/previous group.
   static const double _kOverscrollTrigger = 90;
 
+  /// Kept from initState: dispose() must not look the provider up via context.
+  late final AppProvider _provider;
+
   @override
   void initState() {
     super.initState();
+    _provider = context.read<AppProvider>();
+    // Holds the background library re-scan back until we're done.
+    _provider.inCleanupSession = true;
     _groups = List.from(widget.groups);
     _loadGroup(0);
   }
 
   @override
   void dispose() {
+    _provider.inCleanupSession = false;
     _scroll.dispose();
     super.dispose();
   }

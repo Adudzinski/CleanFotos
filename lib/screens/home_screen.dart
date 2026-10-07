@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -82,6 +84,10 @@ class _HomeScreenState extends State<HomeScreen>
     final provider = context.read<AppProvider>();
     if (provider.state == AppState.permissionDenied) {
       provider.prepare();
+    } else {
+      // Photos taken while we were in the background (iOS keeps the app alive
+      // for days) — re-scan quietly if anything changed.
+      provider.onAppResumed();
     }
     // Returning from the background is another chance to finish deletions that
     // were marked but never confirmed.
@@ -218,9 +224,9 @@ class _HomeScreenState extends State<HomeScreen>
   /// Called when returning from a cleanup mode.
   ///
   /// We do NOT re-run the full analysis here — deletions already update the
-  /// groups live, so re-scanning would just show a loading screen and lose the
-  /// user's place. We only show a quick interstitial. (The user can still pull
-  /// "Refresh" for a fresh scan.)
+  /// groups live, and any library change made during the session is picked up
+  /// by the provider's background re-scan once the mode closes. We only show a
+  /// quick interstitial.
   void _afterMode(AppProvider provider, int deletedBefore,
       [int freedBefore = 0]) {
     // No celebration here: the confetti already fires inside each cleanup
@@ -559,161 +565,155 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildReady(
       BuildContext context, AppProvider provider, AppStrings s) {
     final groupCount = provider.groups.length;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Partial access warning — the app only sees a subset of the library.
-          if (provider.limitedAccess) ...[
-            _buildLimitedAccessBanner(context, s),
-            const SizedBox(height: 14),
-          ],
+    // Pull-to-refresh is a hidden fallback: the library normally re-scans by
+    // itself on changes and on resume, so there's no Refresh button any more.
+    return RefreshIndicator(
+      color: AppTheme.primary,
+      onRefresh: provider.refresh,
+      child: SingleChildScrollView(
+        // Always scrollable, so the pull works even when everything fits.
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Partial access warning — the app only sees a subset of the library.
+            if (provider.limitedAccess) ...[
+              _buildLimitedAccessBanner(context, s),
+              const SizedBox(height: 14),
+            ],
 
-          // ── Cleanup actions (front and center) ───────────────────────────
-          // The modes load + group photos on demand (see _openMode), so they're
-          // available as soon as the library has photos — no upfront scan.
-          // Order: videos first (blue → teal), then photos (pink → red), so
-          // each media type reads as a colour family.
+            // ── Cleanup actions (front and center) ───────────────────────────
+            // The modes load + group photos on demand (see _openMode), so they're
+            // available as soon as the library has photos — no upfront scan.
+            // Order: videos first (blue → teal), then photos (pink → red), so
+            // each media type reads as a colour family.
 
-          // Video Group — the group model, for videos.
-          _buildModeCard(
-            context,
-            cardKey: _videoGroupCardKey,
-            // many videos = group
-            icon: Icons.video_library_rounded,
-            title: s.videoGroupMode,
-            gradient: const [Color(0xFF2563EB), Color(0xFF1B4FC4)],
-            enabled: true,
-            onTap: () =>
-                _openVideoMode(context, provider, s, grouped: true),
-          ),
-          const SizedBox(height: 14),
-
-          // Video swipe — every video, one at a time.
-          _buildModeCard(
-            context,
-            cardKey: _videoCardKey,
-            // one video + swiping hand = swipe
-            icon: Icons.smart_display_rounded,
-            badgeIcon: Icons.swipe_rounded,
-            title: s.videoMode,
-            gradient: const [kVideoAccent, Color(0xFF0E9E88)],
-            enabled: true,
-            onTap: () => _openVideoMode(context, provider, s),
-          ),
-          const SizedBox(height: 14),
-
-          // Picture Group — only when there are (or might be) duplicate groups.
-          if (!provider.groupsLoaded || groupCount > 0) ...[
+            // Video Group — the group model, for videos.
             _buildModeCard(
               context,
-              cardKey: _groupCardKey,
-              // many photos = group
-              icon: Icons.collections_rounded,
-              title: s.groupMode,
-              // Deep crimson: same red family as Picture Swipe's coral pink,
-              // but several shades darker so the two never read as one card.
-              gradient: const [Color(0xFFC2185B), Color(0xFF7B0D3B)],
-              enabled: provider.stats.totalPhotos > 0,
-              onTap: () => _openMode(context, provider, s, swipe: false),
-            ),
-            const SizedBox(height: 14),
-          ],
-
-          // Picture swipe — every photo in the library.
-          if (provider.stats.totalPhotos > 0) ...[
-            _buildModeCard(
-              context,
-              cardKey: _swipeCardKey,
-              // one photo + swiping hand = swipe
-              icon: Icons.photo_rounded,
-              badgeIcon: Icons.swipe_rounded,
-              title: s.swipeMode,
-              gradient: const [AppTheme.secondary, Color(0xFFE84A6F)],
+              cardKey: _videoGroupCardKey,
+              // many videos = group
+              icon: Icons.video_library_rounded,
+              title: s.videoGroupMode,
+              gradient: const [Color(0xFF2563EB), Color(0xFF1B4FC4)],
               enabled: true,
-              onTap: () => _openMode(context, provider, s, swipe: true),
+              onTap: () =>
+                  _openVideoMode(context, provider, s, grouped: true),
             ),
-          ],
-
-          if (provider.groupsLoaded && groupCount == 0) ...[
-            const SizedBox(height: 20),
-            Center(
-              child: Column(
-                children: [
-                  const Icon(Icons.check_circle_outline,
-                      size: 64, color: AppTheme.success),
-                  const SizedBox(height: 16),
-                  Text(s.allClean,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                      textAlign: TextAlign.center),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 14),
-
-          // Pro upsell (above Refresh) — hidden once the user has removed ads.
-          if (!provider.isPro) ...[
-            _buildProPromo(context, s),
             const SizedBox(height: 14),
-          ],
 
-          // Refresh (beneath the Remove Ads button)
-          OutlinedButton.icon(
-            onPressed: () => provider.refresh(),
-            icon: const Icon(Icons.refresh_rounded),
-            label: Text(s.refresh),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 52),
-              foregroundColor: AppTheme.primary,
-              side: const BorderSide(color: AppTheme.primary),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              textStyle: const TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w600),
+            // Video swipe — every video, one at a time.
+            _buildModeCard(
+              context,
+              cardKey: _videoCardKey,
+              // one video + swiping hand = swipe
+              icon: Icons.smart_display_rounded,
+              badgeIcon: Icons.swipe_rounded,
+              title: s.videoMode,
+              gradient: const [kVideoAccent, Color(0xFF0E9E88)],
+              enabled: true,
+              onTap: () => _openVideoMode(context, provider, s),
             ),
-          ),
+            const SizedBox(height: 14),
 
-          const SizedBox(height: 28),
-
-          // Lifetime saved summary (above the stats, neutral stat-card style)
-          _buildSavedSummary(context, provider, s),
-          const SizedBox(height: 14),
-
-          // ── Stats (below the actions) ─────────────────────────────────────
-          Row(
-            children: [
-              _buildStatCard(
+            // Picture Group — only when there are (or might be) duplicate groups.
+            if (!provider.groupsLoaded || groupCount > 0) ...[
+              _buildModeCard(
                 context,
-                icon: Icons.photo_library_outlined,
-                label: s.totalPhotos,
-                value: '${provider.stats.totalPhotos}',
-                color: AppTheme.primary,
+                cardKey: _groupCardKey,
+                // many photos = group
+                icon: Icons.collections_rounded,
+                title: s.groupMode,
+                // Deep crimson: same red family as Picture Swipe's coral pink,
+                // but several shades darker so the two never read as one card.
+                gradient: const [Color(0xFFC2185B), Color(0xFF7B0D3B)],
+                enabled: provider.stats.totalPhotos > 0,
+                onTap: () => _openMode(context, provider, s, swipe: false),
               ),
-              const SizedBox(width: 14),
-              _buildStatCard(
+              const SizedBox(height: 14),
+            ],
+
+            // Picture swipe — every photo in the library.
+            if (provider.stats.totalPhotos > 0) ...[
+              _buildModeCard(
                 context,
-                icon: Icons.storage_outlined,
-                label: s.librarySize,
-                value: provider.stats.totalSizeFormatted,
-                color: const Color(0xFF43A8D0),
+                cardKey: _swipeCardKey,
+                // one photo + swiping hand = swipe
+                icon: Icons.photo_rounded,
+                badgeIcon: Icons.swipe_rounded,
+                title: s.swipeMode,
+                gradient: const [AppTheme.secondary, Color(0xFFE84A6F)],
+                enabled: true,
+                onTap: () => _openMode(context, provider, s, swipe: true),
               ),
             ],
-          ),
-        ],
+
+            if (provider.groupsLoaded && groupCount == 0) ...[
+              const SizedBox(height: 20),
+              Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.check_circle_outline,
+                        size: 64, color: AppTheme.success),
+                    const SizedBox(height: 16),
+                    Text(s.allClean,
+                        style: Theme.of(context).textTheme.headlineMedium,
+                        textAlign: TextAlign.center),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 14),
+
+            // Pro upsell — hidden once the user has removed ads.
+            if (!provider.isPro) ...[
+              _buildProPromo(context, s),
+            ],
+
+            const SizedBox(height: 28),
+
+            // Lifetime saved summary (above the stats, neutral stat-card style)
+            _buildSavedSummary(context, provider, s),
+            const SizedBox(height: 14),
+
+            // ── Stats (below the actions) ─────────────────────────────────────
+            Row(
+              children: [
+                _buildStatCard(
+                  context,
+                  icon: Icons.photo_library_outlined,
+                  label: s.totalPhotos,
+                  value: '${provider.stats.totalPhotos}',
+                  color: AppTheme.primary,
+                ),
+                const SizedBox(width: 14),
+                _buildStatCard(
+                  context,
+                  icon: Icons.storage_outlined,
+                  label: s.librarySize,
+                  value: provider.stats.totalSizeFormatted,
+                  color: const Color(0xFF43A8D0),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   /// Warning card shown when the OS only granted access to selected photos —
   /// the single most common reason "not all my pictures show up". Tapping it
-  /// opens the app's permission settings.
+  /// opens the iOS "select more photos" picker, or the app's permission
+  /// settings on Android. Either way the library-change listener re-scans
+  /// when the user comes back.
   Widget _buildLimitedAccessBanner(BuildContext context, AppStrings s) {
     return GestureDetector(
-      onTap: () => PhotoManager.openSetting(),
+      onTap: () => Platform.isIOS
+          ? PhotoManager.presentLimited()
+          : PhotoManager.openSetting(),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),

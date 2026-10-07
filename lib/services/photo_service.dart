@@ -40,11 +40,32 @@ class PhotoService {
         state == PermissionState.limited;
   }
 
-  /// Total number of image assets (metadata only — very fast). Used to show
-  /// library stats on the home screen without loading every photo.
-  Future<int> totalCount() async {
-    final assets = await loadAllAssets();
-    return assets.length;
+  /// Total number of image assets — a single count query, without loading any
+  /// assets. Used to show the library size on Home straight away. On OEMs
+  /// whose "All" album is incomplete this can be lower than what
+  /// [loadAllAssets] finds; the provider takes the scan's number once it ran.
+  Future<int> totalCount() => PhotoManager.getAssetCount(
+        type: RequestType.image,
+        filterOption: _newestFirstFilter,
+      );
+
+  /// Cheap "did the photos change?" probe: the image count plus the id of the
+  /// newest image — two small queries instead of a full scan. Additions and
+  /// deletions change it; edits, favourites and iCloud sync churn don't.
+  Future<String> libraryFingerprint() async {
+    await PhotoManager.releaseCache();
+    final count = await totalCount();
+    final paths = await PhotoManager.getAssetPathList(
+      type: RequestType.image,
+      onlyAll: true,
+      filterOption: _newestFirstFilter,
+    );
+    var newestId = '';
+    if (paths.isNotEmpty) {
+      final newest = await paths.first.getAssetListRange(start: 0, end: 1);
+      if (newest.isNotEmpty) newestId = newest.first.id;
+    }
+    return '$count|$newestId';
   }
 
   /// Load every image once (deduped), sorted newest-in-library first.
