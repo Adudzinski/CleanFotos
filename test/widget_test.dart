@@ -6,7 +6,7 @@ import 'package:cleanfotos_app/theme/app_theme.dart';
 
 void main() {
   test('all supported languages resolve', () {
-    for (final code in ['en', 'es', 'de', 'fr', 'pt', 'it']) {
+    for (final code in ['en', 'es', 'de', 'fr', 'pt', 'it', 'pl']) {
       expect(AppStrings.of(code).languageCode, code);
     }
     // Unknown language falls back to English.

@@ -194,10 +194,10 @@ class _VideoSwipeScreenState extends State<VideoSwipeScreen> {
     // while the OS prompt is up the marks survive and Home picks them up next
     // launch. flushPendingDeletions() clears them only once the user has
     // actually answered.
-    final freed = await _provider.flushPendingDeletions();
+    final result = await _provider.flushPendingDeletions();
     _isCommitting = false;
 
-    if (freed == 0) {
+    if (!result.confirmed) {
       // The user declined the system prompt. Do NOT re-queue the batch: it
       // would be retried from dispose() and they'd be asked a second time
       // for the same photos. One "no" is enough — the photos simply stay.

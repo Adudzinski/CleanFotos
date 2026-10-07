@@ -1,4 +1,5 @@
 import 'dart:async' show Timer, unawaited;
+import 'dart:convert' show jsonDecode, jsonEncode;
 import 'dart:io' show Platform;
 import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:flutter/services.dart' show MethodCall;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
+import '../models/delete_result.dart';
+import '../models/milestone.dart';
 import '../models/photo_group.dart';
 import '../services/ad_service.dart';
 import '../services/feedback_service.dart';
@@ -13,6 +16,7 @@ import '../services/notification_service.dart';
 import '../services/photo_service.dart';
 import '../services/purchase_service.dart';
 import '../utils/asset_utils.dart';
+import '../utils/format.dart' as fmt;
 
 const Set<String> kSupportedLanguages = {'en', 'es', 'de', 'fr', 'pt', 'it', 'pl'};
 
@@ -46,8 +50,21 @@ class AppProvider extends ChangeNotifier {
   int _totalPhotos = 0;
 
   // Persistent
+  /// Lifetime bytes freed — confirmed deletions only (measured on Android,
+  /// estimated on iOS; see PhotoService.assetBytes).
   int freedBytes = 0;
   int deletedCount = 0;
+
+  /// Highest milestone reached (index into Milestone.ladder), −1 for none.
+  int milestoneIndex = -1;
+
+  /// Milestone index → when it was reached. Tiers set by the 1.3 migration
+  /// have no date.
+  Map<int, DateTime> milestoneDates = {};
+
+  /// Running totals of measured photo sizes, for "room for about N photos".
+  int _measuredBytes = 0;
+  int _measuredCount = 0;
   String languageCode = 'en';
   bool isPro = false;
   bool onboardingSeen = false;
@@ -65,6 +82,9 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     freedBytes = prefs.getInt('freed_bytes') ?? 0;
     deletedCount = prefs.getInt('deleted_count') ?? 0;
+    _measuredBytes = prefs.getInt(_kMeasuredBytes) ?? 0;
+    _measuredCount = prefs.getInt(_kMeasuredCount) ?? 0;
+    await _loadMilestones(prefs);
     // Default to the phone's language on first launch, else the saved choice.
     languageCode = prefs.getString('language_code') ?? _deviceLanguage();
     isPro = prefs.getBool('is_pro') ?? false;
@@ -473,6 +493,65 @@ class AppProvider extends ChangeNotifier {
     await reloadLibrary(silent: false);
   }
 
+  // ─── Milestones ───────────────────────────────────────────────────────────
+
+  static const String _kMilestoneIndex = 'milestone_index';
+  static const String _kMilestoneDates = 'milestone_dates';
+  static const String _kMeasuredBytes = 'measured_bytes';
+  static const String _kMeasuredCount = 'measured_count';
+
+  Future<void> _loadMilestones(SharedPreferences prefs) async {
+    if (!prefs.containsKey(_kMilestoneIndex)) {
+      // First launch of 1.3: start from the tier the existing freed_bytes
+      // already reached — silently, so upgraders aren't retro-celebrated.
+      milestoneIndex = Milestone.reachedIndex(freedBytes);
+      await prefs.setInt(_kMilestoneIndex, milestoneIndex);
+    } else {
+      milestoneIndex = prefs.getInt(_kMilestoneIndex) ?? -1;
+    }
+    milestoneDates = {};
+    final raw = prefs.getString(_kMilestoneDates);
+    if (raw != null) {
+      try {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        map.forEach((k, v) {
+          final i = int.tryParse(k);
+          final d = DateTime.tryParse(v as String);
+          if (i != null && d != null) milestoneDates[i] = d;
+        });
+      } catch (_) {}
+    }
+  }
+
+  /// The next tier to aim for, or null once every tier is reached.
+  Milestone? get nextMilestone => Milestone.after(milestoneIndex);
+
+  /// Average photo size: measured when we have measurements, else ~3.5 MB.
+  int get avgPhotoBytes =>
+      _measuredCount > 0 ? _measuredBytes ~/ _measuredCount : kAvgPhotoBytes;
+
+  /// "Room for about N new photos" for [bytes], to 2 significant figures.
+  int photosEquivalent(int bytes) => fmt.roundTo2Sig(bytes / avgPhotoBytes);
+
+  /// Record any tiers newly crossed by the current [freedBytes] and return
+  /// the highest one, or null. Each tier is celebrated once.
+  Future<Milestone?> _checkMilestones(SharedPreferences prefs) async {
+    final reached = Milestone.reachedIndex(freedBytes);
+    if (reached <= milestoneIndex) return null;
+    final now = DateTime.now();
+    for (var i = milestoneIndex + 1; i <= reached; i++) {
+      milestoneDates[i] = now;
+    }
+    milestoneIndex = reached;
+    await prefs.setInt(_kMilestoneIndex, milestoneIndex);
+    await prefs.setString(
+      _kMilestoneDates,
+      jsonEncode(milestoneDates
+          .map((k, v) => MapEntry('$k', v.toIso8601String()))),
+    );
+    return Milestone.ladder[reached];
+  }
+
   // ─── Pending deletions (survive the app being closed) ─────────────────────
   //
   // The OS confirmation for deleting media can only be shown by a FOREGROUND
@@ -512,6 +591,17 @@ class AppProvider extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
+  /// Take items back out of the queue — Undo in the swipe decks.
+  Future<void> unqueueDeletion(List<AssetEntity> assets,
+      {bool notify = true}) async {
+    if (assets.isEmpty) return;
+    final ids = assets.map((a) => a.id).toSet();
+    _pendingDeleteIds.removeWhere(ids.contains);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_kPendingDeleteIds, _pendingDeleteIds);
+    if (notify) notifyListeners();
+  }
+
   Future<void> _clearPendingDeletions() async {
     _pendingDeleteIds = [];
     final prefs = await SharedPreferences.getInstance();
@@ -524,9 +614,10 @@ class AppProvider extends ChangeNotifier {
   Future<void> discardPendingDeletions() => _clearPendingDeletions();
 
   /// Delete everything currently marked, in a single system prompt.
-  /// Safe to call when nothing is pending, and safe to call twice.
-  Future<int> flushPendingDeletions() async {
-    if (_isFlushing || _pendingDeleteIds.isEmpty) return 0;
+  /// Safe to call when nothing is pending, and safe to call twice (the second
+  /// call returns [DeleteResult.none]).
+  Future<DeleteResult> flushPendingDeletions() async {
+    if (_isFlushing || _pendingDeleteIds.isEmpty) return DeleteResult.none;
     _isFlushing = true;
     try {
       final ids = List<String>.from(_pendingDeleteIds);
@@ -542,10 +633,12 @@ class AppProvider extends ChangeNotifier {
       if (assets.isEmpty) {
         // Nothing left to delete (already gone) — drop the marks.
         await _clearPendingDeletions();
-        return 0;
+        return DeleteResult.none;
       }
 
-      final freed = await deleteAssets(assets);
+      // Measure real sizes BEFORE deleting — afterwards the files are gone.
+      final sizes = await _service.measureBytes(assets);
+      final result = await deleteAssets(assets, measuredBytes: sizes);
 
       // Clear only once deleteAssets has RETURNED. Returning means the user
       // actually answered the system prompt — allow or deny — and either way
@@ -557,7 +650,7 @@ class AppProvider extends ChangeNotifier {
       // finish the job next launch. Clearing before the prompt would have
       // thrown the marks away in exactly the case they're needed.
       await _clearPendingDeletions();
-      return freed;
+      return result;
     } finally {
       _isFlushing = false;
       // A re-scan postponed for the delete (the delete itself is a library
@@ -574,11 +667,15 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Delete ───────────────────────────────────────────────────────────────
 
-  /// Delete the given assets in one batch (one system confirmation dialog).
-  /// Returns estimated bytes freed. No-op / 0 if the user denies or deletion
-  /// fails — callers must check before updating their local UI.
-  Future<int> deleteAssets(List<AssetEntity> toDelete) async {
-    if (toDelete.isEmpty) return 0;
+  /// Delete the given assets in one batch (one system confirmation dialog)
+  /// and report what really happened. [measuredBytes] (id → size) replaces
+  /// the per-type average for the items it covers.
+  ///
+  /// Nothing is counted until the OS confirms the items are gone: a denial
+  /// returns a `declined` result with zero bytes and no progress.
+  Future<DeleteResult> deleteAssets(List<AssetEntity> toDelete,
+      {Map<String, int> measuredBytes = const {}}) async {
+    if (toDelete.isEmpty) return DeleteResult.none;
     final requestedIds = toDelete.map((a) => a.id).toList();
 
     // Track whether the platform call actually errored. A plain denial
@@ -601,6 +698,7 @@ class AppProvider extends ChangeNotifier {
     // (Android 11+). We deliberately do NOT run this after a plain denial:
     // moveToTrash opens a second system dialog, so the user was being asked
     // to confirm twice after already saying no.
+    var usedTrash = false;
     if (deletedIds.isEmpty && deleteThrew && Platform.isAndroid) {
       try {
         await PhotoManager.editor.android.moveToTrash(toDelete);
@@ -608,30 +706,55 @@ class AppProvider extends ChangeNotifier {
         debugPrint('deleteAssets: moveToTrash fallback failed: $e');
       }
       deletedIds = await _confirmDeleted(requestedIds);
+      usedTrash = deletedIds.isNotEmpty;
     }
 
     if (deletedIds.isEmpty) {
       debugPrint(
           'deleteAssets: user denied or nothing deleted (${toDelete.length} requested)');
-      return 0;
+      return DeleteResult(
+        requested: requestedIds.length,
+        deleted: 0,
+        bytes: 0,
+        declined: true,
+      );
     }
     debugPrint(
         'deleteAssets: ${deletedIds.length}/${requestedIds.length} confirmed deleted');
 
-    final freed = deletedIds.length * kAvgPhotoBytes;
+    // Sum sizes for the CONFIRMED ids only. Measured where we could read the
+    // file, the per-type average otherwise.
+    final deletedSet = deletedIds.toSet();
+    var freed = 0;
+    var measuredPhotoBytes = 0;
+    var measuredPhotoCount = 0;
+    for (final a in toDelete) {
+      if (!deletedSet.contains(a.id)) continue;
+      final isVideo = a.type == AssetType.video;
+      final measured = measuredBytes[a.id];
+      freed += measured ?? (isVideo ? kAvgVideoBytes : avgPhotoBytes);
+      if (measured != null && !isVideo) {
+        measuredPhotoBytes += measured;
+        measuredPhotoCount++;
+      }
+    }
     freedBytes += freed;
     deletedCount += deletedIds.length;
+    _measuredBytes += measuredPhotoBytes;
+    _measuredCount += measuredPhotoCount;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('freed_bytes', freedBytes);
     await prefs.setInt('deleted_count', deletedCount);
+    await prefs.setInt(_kMeasuredBytes, _measuredBytes);
+    await prefs.setInt(_kMeasuredCount, _measuredCount);
+    final newMilestone = await _checkMilestones(prefs);
 
     // The user has now cleaned something up, so this is a much better moment
     // to ask about notifications than a cold first launch.
     unawaited(maybeSetupReminders());
 
     // Remove the actually-deleted assets from the cached lists.
-    final deletedSet = deletedIds.toSet();
     if (photosLoaded) {
       allPhotos =
           allPhotos.where((a) => !deletedSet.contains(a.id)).toList();
@@ -656,7 +779,14 @@ class AppProvider extends ChangeNotifier {
     stats = _service.estimateStats(_totalPhotos, groups);
 
     notifyListeners();
-    return freed;
+    return DeleteResult(
+      requested: requestedIds.length,
+      deleted: deletedIds.length,
+      bytes: freed,
+      declined: false,
+      usedTrash: usedTrash,
+      newMilestone: newMilestone,
+    );
   }
 
   /// Re-query MediaStore and return the ids that no longer resolve — i.e. the

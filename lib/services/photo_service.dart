@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:photo_manager/photo_manager.dart';
 import '../models/photo_group.dart';
 import '../utils/asset_utils.dart';
@@ -103,6 +105,44 @@ class PhotoService {
 
     sortAssetsNewestFirst(result);
     return result;
+  }
+
+  /// Size of [asset] on disk in bytes, or null when it can't be read cheaply.
+  ///
+  /// Android: a stat of the real file path — fast. (Android 10 would copy the
+  /// file into a scoped cache first, but the manifest's
+  /// requestLegacyExternalStorage keeps it on real paths there too.)
+  ///
+  /// iOS: always null for 1.3. photo_manager can only hand out an original by
+  /// copying it into the app's cache (PHAssetResourceManager), which for a
+  /// batch of videos means gigabytes of writes before the delete prompt.
+  /// Callers fall back to the per-type average there.
+  Future<int?> assetBytes(AssetEntity asset) async {
+    if (!Platform.isAndroid) return null;
+    final f = await asset.file;
+    if (f == null) return null;
+    final length = await f.length();
+    return length > 0 ? length : null;
+  }
+
+  /// Measure many assets in parallel, giving up after [timeout] overall.
+  /// Returns id → bytes for whatever was measured in time.
+  Future<Map<String, int>> measureBytes(
+    List<AssetEntity> assets, {
+    Duration timeout = const Duration(seconds: 2),
+  }) async {
+    final measured = <String, int>{};
+    try {
+      await Future.wait(assets.map((a) async {
+        try {
+          final b = await assetBytes(a);
+          if (b != null) measured[a.id] = b;
+        } catch (_) {}
+      })).timeout(timeout);
+    } catch (_) {
+      // Timed out — use what we have; the rest falls back to estimates.
+    }
+    return Map.of(measured);
   }
 
   /// Group assets by capture time. No file reads, no decoding → fast.
