@@ -3,6 +3,11 @@
     <!-- Photo & video access -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <!-- Android 14+ "Select photos": without this the system runs partial
+         access in compatibility mode, telling us we have FULL access while
+         only the picked photos are visible — so the limited-access banner
+         never showed. Declaring it lets photo_manager report `limited`. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <!-- For Android 12 and below -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />

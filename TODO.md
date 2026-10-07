@@ -52,14 +52,16 @@ The same line covers Askra and AppSwipe (one shared publisher ID). Nothing to ch
 
 Each call re-enumerates every album and re-materialises up to 50,000 `AssetEntity` objects.
 
-- [ ] Cache the asset list in `AppProvider` and invalidate on permission change / photo-library
-      change notification, rather than reloading per screen.
+- [x] Cache the asset list in `AppProvider` and invalidate on permission change / photo-library
+      change notification, rather than reloading per screen. **Done in 1.3** — one shared scan,
+      re-run on change notifications / resume, skipped when a cheap fingerprint is unchanged.
 
 ### 3.2 `totalCount()` loads the whole library just to return a number
 
 `lib/services/photo_service.dart:45-48` calls `loadAllAssets()` and returns `.length`.
 
-- [ ] Sum `album.assetCountAsync` instead — metadata only, no asset materialisation.
+- [x] Sum `album.assetCountAsync` instead — metadata only, no asset materialisation.
+      **Done in 1.3** with `PhotoManager.getAssetCount` (one query, no dedupe issue).
       Note the dedupe caveat: albums overlap, so counting needs the "All" album where available
       rather than a naive sum across albums.
 

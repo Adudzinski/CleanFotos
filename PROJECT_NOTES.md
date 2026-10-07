@@ -95,20 +95,40 @@ same items. The fallback now only runs when `deleteWithIds` genuinely *threw*.
 - iOS `BouncingScrollPhysics` → *moves* past the edge, emits almost no
   overscroll notifications.
 
-Overscroll-to-change-group must handle **both**: measure `metrics.pixels`
-beyond `min/maxScrollExtent` (iOS) *and* accumulate `OverscrollNotification`
-(Android). iOS also springs back through the same out-of-range positions, so a
-`_navLock` is needed to prevent a double trigger on the rebound.
+(1.2's overscroll group navigation had to handle both. It was removed on
+purpose in 1.3 — explicit buttons instead. Keep this in mind if a gesture like
+it ever comes back.)
 
 ### `VideoPlayerController.contentUri` is Android-only
 On iOS `getMediaUrl()` returns a file URL and `contentUri` fails silently. Use
-the shared `buildAssetVideoController()` helper
-(`video_group_review_screen.dart`), which branches on `Platform.isAndroid`.
+the shared `buildAssetVideoController()` helper (`utils/video_utils.dart`),
+which branches on `Platform.isAndroid`.
 
-### `CelebrationOverlay.of(context)` returns null
-`findAncestorStateOfType` searches **ancestors**, but each screen builds the
-overlay *below* its own context — so the lookup always failed and confetti never
-appeared anywhere. All four screens now use a `GlobalKey<CelebrationOverlayState>`.
+### The library cache never refreshed itself (fixed in 1.3)
+The scan was cached for the process lifetime, and iOS keeps apps alive for
+days — new photos never appeared until the user found Refresh. Now
+`AppProvider` registers `PhotoManager.addChangeCallback` once, re-scans
+(debounced 1.5 s) and re-checks on resume after 60 s. iOS fires "changes" for
+every iCloud sync batch, so automatic re-scans first compare a cheap
+fingerprint (count + newest id) and skip when nothing changed.
+
+### Measuring file sizes on iOS copies the file
+photo_manager's `originFile`/`file` on iOS writes the original into the app's
+cache (`PHAssetResourceManager`). Measuring a batch of videos that way means
+gigabytes of writes. 1.3 measures on Android only (a stat of the real path —
+Android 10 also gets real paths because of `requestLegacyExternalStorage`)
+and uses averages on iOS.
+
+### `SliverFillRemaining(hasScrollBody: false)` + `LayoutBuilder` = crash
+It asks its child for intrinsic sizes, which `LayoutBuilder` can't give — the
+whole Home went blank. `ProgressTrack` uses `AnimatedFractionallySizedBox`.
+
+### audioplayers: two traps
+- `AudioContextConfig(respectSilence: true, focus: mixWithOthers)` *asserts* on
+  iOS and maps Android to the ringtone stream. Build `AudioContextIOS(ambient)`
+  / `AudioContextAndroid(sonification, focus none)` explicitly.
+- The default `ReleaseMode.release` unloads a source after it plays; use
+  `ReleaseMode.stop` for preloaded effects.
 
 ### Text without a `Material` ancestor
 Renders with an ugly yellow/red dotted underline. Wrap overlay text in
@@ -139,36 +159,48 @@ silently does nothing. Always pass the numeric App Store ID.
 
 ```
 lib/
-├── main.dart                       resets setIgnorePermissionCheck(false)
-├── providers/app_provider.dart     state, caches, deletion, pending queue
+├── main.dart                       dark-only Noir theme; resets setIgnorePermissionCheck(false)
+├── providers/app_provider.dart     state, caches, library change listener,
+│                                   deletion → DeleteResult, milestones, pending queue
+├── models/                         photo_group, delete_result (+ MediaKind), milestone
 ├── services/
-│   ├── photo_service.dart          library scan + time grouping
+│   ├── photo_service.dart          library scan, fingerprint, time grouping, measureBytes
 │   ├── video_service.dart          video access (partial-permission flow)
+│   ├── feedback_service.dart       Fx sounds + haptics (singleton)
 │   ├── ad_service.dart             ATT → UMP consent → AdMob
 │   ├── purchase_service.dart       cleanpics_pro
 │   ├── review_service.dart         rate button + native prompt
 │   └── notification_service.dart   twice-yearly reminders
-├── screens/                        home, group_review, video_group_review,
-│                                   swipe, video_swipe, settings
-└── widgets/                        celebration_overlay, idle_gesture_hint,
-                                    photo_card, banner_ad_widget, coachmark
+├── screens/
+│   ├── home_screen.dart            freshness line, tabs, mode cards, milestone card
+│   ├── swipe_screen.dart           "One by one" (photos + videos; video_swipe_screen wraps it)
+│   ├── group_review_screen.dart    "Similar shots/clips" (video_group_review_screen wraps it)
+│   ├── session.dart                shared Finish → system prompt → Finished screen
+│   ├── session_summary_screen.dart "Finished" (+ milestone card)
+│   ├── milestones_screen.dart
+│   └── settings_screen.dart
+├── theme/                          noir.dart (tokens + type), app_theme.dart (ThemeData)
+├── utils/                          format (counts/bytes, no intl), asset_utils, video_utils
+└── widgets/noir/                   NoirButton, NoirCard, NoirHeader, PendingPill, …
 ```
 
 Localization is **in-code** (`l10n/strings.dart`), not ARB: a base `AppStrings`
 class with one subclass per language. 7 languages: **en, es, de, fr, pt, it, pl**.
 Adding a string means adding it to the base class *and* 6 overrides.
 
-### The four cleanup modes
+### The cleanup modes (1.3)
 
-| Mode | Colour | Interaction |
-|---|---|---|
-| Video Group | blue `#2563EB` | grid, tap to mark, **hold a tile to play inline** |
-| Video Swipe | teal `#16BFA6` | one at a time, hold to preview |
-| Picture Group | crimson `#C2185B` | grid, tap to mark |
-| Picture Swipe | pink `#FF6584` | one at a time |
+Home has a Photos / Videos tab; each has two modes.
 
-Group modes: **no Next button**. Navigate by pulling past the top/bottom of the
-grid (overscroll). Idle for ~4s → animated arrows explain the gesture.
+| Mode | Interaction |
+|---|---|
+| Similar shots / Similar clips | grid of one time-group, tap to mark; "Delete n · Next" / "Keep all · Next" / Previous; hold a video tile to play inline, hold a photo for the viewer |
+| One by one (photos / videos) | card deck, Delete / Keep buttons or swipe, Undo (50 steps), hold to play videos |
+
+Noir is **dark-only**; colour is reserved: white = primary, red `Noir.danger` =
+delete only, gold `Noir.reward` = milestones only. Confetti, overscroll
+navigation, idle hints and the Home coachmark tour were **removed on purpose**
+in 1.3 — don't bring them back without a decision.
 
 ---
 
@@ -196,9 +228,21 @@ Guards that matter (all were real bugs):
 - Never latch commits behind a one-shot bool: an early commit would consume it
   and everything marked afterwards would never delete.
 
-**Known honesty gap:** the confetti says "12 MB freed" the moment items are
-marked, before the OS confirms. Safe (nothing is lost) but overstated. Moving
-the celebration after confirmation is an open improvement.
+**Honest results (1.3):** `deleteAssets` returns a `DeleteResult` (requested,
+deleted, bytes, declined, usedTrash, newMilestone). Bytes count only ids the OS
+confirmed gone — measured on Android, averaged on iOS. The celebration lives
+on the Finished screen, after the prompt; in-session numbers are labelled
+"marked" and "~". A decline shows "Nothing was deleted" and counts nothing.
+
+**Session flow:** every mode sets `provider.inCleanupSession` (re-scans wait
+until it's off). Finish with nothing marked → Home. Otherwise one prompt, then
+`SessionSummaryScreen` replaces the mode (`session.dart`). Home awaits the
+summary route before any interstitial / review / notification request, and
+skips them while the user chains "Keep going".
+
+**Milestones:** 100 MB, 250 MB, 500 MB, 1/2/5/10/25/50 GB (binary units).
+`milestone_index` = highest reached; first 1.3 launch migrates it silently
+from `freed_bytes`. `milestone_dates` stores when each tier was reached.
 
 ---
 
@@ -226,14 +270,18 @@ the celebration after confirmation is an open improvement.
 - [ ] Confirm AdMob **Payments** profile is complete (blocks serving even after
       approval).
 - [ ] Rename the **Play Store listing** from "CleanPics" to "CleanFotos".
-- [ ] Verify on a real iPhone: overscroll group navigation, inline video
-      hold-to-play, and the full delete flow. Both iOS paths were written
-      without device testing.
+- [ ] Verify 1.3 on a real iPhone: library auto-refresh, limited-access
+      picker, hold-to-play, sounds with the silent switch, the full delete
+      flow. The iOS paths were written without device testing (Android was
+      checked on the API 36 emulator).
+- [ ] Rename the app in the AdMob console — the consent form still says
+      "CleanPics".
+- [ ] Optional: measure real sizes on iOS too (needs a native PHAssetResource
+      size lookup — photo_manager can't do it without copying).
 - [ ] Video groups may be sparse — grouping needs 2+ videos within 3 minutes.
       Consider widening the window for videos.
 - [ ] Dependencies are several majors behind. Upgrade one at a time, never
       right before a release (`flutter_local_notifications` 17→22 is breaking).
-- [ ] Optional: fire the celebration only after the OS confirms deletion.
 
 ---
 

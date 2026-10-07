@@ -273,8 +273,9 @@ class AppProvider extends ChangeNotifier {
   Future<void> onAppResumed() async {
     if (state != AppState.ready) return;
     // The user may have changed the access level in Settings meanwhile —
-    // granting full access doesn't restart the app.
-    await _refreshAccessLevel();
+    // granting full access doesn't restart the app, and Android sends no
+    // library-change event for it, so a changed level means a re-scan.
+    if (await _refreshAccessLevel()) _libraryStale = true;
     final last = lastScanAt;
     final old = last == null ||
         DateTime.now().difference(last) > const Duration(seconds: 60);
@@ -351,19 +352,22 @@ class AppProvider extends ChangeNotifier {
   /// Re-read whether access is full or "Selected photos" only, without
   /// prompting. Only revoking access restarts the app, so a change from
   /// limited to full would otherwise go unnoticed until the next launch.
-  Future<void> _refreshAccessLevel() async {
+  /// Returns true if the level changed.
+  Future<bool> _refreshAccessLevel() async {
     try {
       final ps = await PhotoManager.getPermissionState(
           requestOption: const PermissionRequestOption());
       if (ps != PermissionState.authorized && ps != PermissionState.limited) {
-        return;
+        return false;
       }
       final limited = ps == PermissionState.limited;
       if (limited != limitedAccess) {
         limitedAccess = limited;
         notifyListeners();
+        return true;
       }
     } catch (_) {}
+    return false;
   }
 
   /// Wait for a scan in flight, and re-scan first if the library changed
