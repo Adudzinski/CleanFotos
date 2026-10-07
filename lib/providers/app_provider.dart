@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
 import '../models/photo_group.dart';
 import '../services/ad_service.dart';
+import '../services/feedback_service.dart';
 import '../services/notification_service.dart';
 import '../services/photo_service.dart';
 import '../services/purchase_service.dart';
@@ -51,8 +52,9 @@ class AppProvider extends ChangeNotifier {
   bool isPro = false;
   bool onboardingSeen = false;
 
-  /// Theme preference: 'system' (default), 'light' or 'dark'.
-  String themePref = 'system';
+  /// Settings → Feedback. Both default on; mirrored into FeedbackService.
+  bool soundsEnabled = true;
+  bool hapticsEnabled = true;
 
   /// Ads show unless the user has unlocked Pro.
   bool get adsEnabled => !isPro;
@@ -67,7 +69,13 @@ class AppProvider extends ChangeNotifier {
     languageCode = prefs.getString('language_code') ?? _deviceLanguage();
     isPro = prefs.getBool('is_pro') ?? false;
     onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
-    themePref = prefs.getString('theme_pref') ?? 'system';
+    soundsEnabled = prefs.getBool('sounds_enabled') ?? true;
+    hapticsEnabled = prefs.getBool('haptics_enabled') ?? true;
+    FeedbackService.instance
+      ..soundsEnabled = soundsEnabled
+      ..hapticsEnabled = hapticsEnabled;
+    // Preload the sounds without holding up startup.
+    unawaited(FeedbackService.instance.init());
     await _loadPendingDeletions();
     notifyListeners();
 
@@ -688,11 +696,20 @@ class AppProvider extends ChangeNotifier {
     await _setupReminders();
   }
 
-  Future<void> setThemePref(String value) async {
-    themePref = value;
+  Future<void> setSoundsEnabled(bool value) async {
+    soundsEnabled = value;
+    FeedbackService.instance.soundsEnabled = value;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('theme_pref', value);
+    await prefs.setBool('sounds_enabled', value);
+  }
+
+  Future<void> setHapticsEnabled(bool value) async {
+    hapticsEnabled = value;
+    FeedbackService.instance.hapticsEnabled = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('haptics_enabled', value);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/app_provider.dart';
 import '../services/ad_service.dart';
+import '../services/feedback_service.dart';
 import '../services/purchase_service.dart';
 import '../services/review_service.dart';
 import '../theme/app_theme.dart';
@@ -43,9 +44,9 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // ── Design (System / Light / Dark) ────────────────────────────────
-          _sectionHeader(s.theme),
-          _themeCard(context, provider, s),
+          // ── Feedback (sounds + haptics) ───────────────────────────────────
+          _sectionHeader(s.feedback),
+          _feedbackCard(context, provider, s),
 
           const SizedBox(height: 24),
 
@@ -183,50 +184,31 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _themeCard(
+  Widget _feedbackCard(
       BuildContext context, AppProvider provider, AppStrings s) {
-    final options = [
-      {'value': 'system', 'label': s.themeSystem, 'icon': Icons.brightness_auto},
-      {'value': 'light', 'label': s.themeLight, 'icon': Icons.light_mode_outlined},
-      {'value': 'dark', 'label': s.themeDark, 'icon': Icons.dark_mode_outlined},
-    ];
-
     return _card(
       child: Column(
-        children: options.map((opt) {
-          final selected = provider.themePref == opt['value'];
-          return InkWell(
-            onTap: () => provider.setThemePref(opt['value'] as String),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-              child: Row(
-                children: [
-                  Icon(opt['icon'] as IconData,
-                      size: 22,
-                      color: selected
-                          ? AppTheme.primary
-                          : AppTheme.textSecondary),
-                  const SizedBox(width: 14),
-                  Text(opt['label'] as String,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w400,
-                        color: selected
-                            ? AppTheme.primary
-                            : AppTheme.textPrimary,
-                      )),
-                  const Spacer(),
-                  if (selected)
-                    const Icon(Icons.check_circle,
-                        color: AppTheme.primary, size: 22),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(s.sounds, style: const TextStyle(fontSize: 17)),
+            value: provider.soundsEnabled,
+            onChanged: (v) {
+              provider.setSoundsEnabled(v);
+              FeedbackService.instance.play(Fx.tap);
+            },
+          ),
+          _divider(),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(s.haptics, style: const TextStyle(fontSize: 17)),
+            value: provider.hapticsEnabled,
+            onChanged: (v) {
+              provider.setHapticsEnabled(v);
+              FeedbackService.instance.play(Fx.tap);
+            },
+          ),
+        ],
       ),
     );
   }

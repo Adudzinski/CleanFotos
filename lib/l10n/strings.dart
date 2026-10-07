@@ -131,6 +131,9 @@ class AppStrings {
   String get themeSystem => 'System';
   String get themeLight => 'Light';
   String get themeDark => 'Dark';
+  String get feedback => 'Feedback';
+  String get sounds => 'Sounds';
+  String get haptics => 'Haptics';
   String get reminders => 'Reminders';
   String get monthlyReminder => 'Monthly cleanup reminder';
   String get monthlyReminderDesc =>
@@ -180,6 +183,10 @@ class _EnglishStrings extends AppStrings {
 // ─── Spanish ──────────────────────────────────────────────────────────────────
 class _SpanishStrings extends AppStrings {
   const _SpanishStrings() : super._('es');
+
+  @override String get feedback => 'Sonido y vibración';
+  @override String get sounds => 'Sonidos';
+  @override String get haptics => 'Vibración';
 
   @override String get welcomeTitle => 'Limpia tus fotos';
   @override String get welcomeSubtitle =>
@@ -288,6 +295,10 @@ class _SpanishStrings extends AppStrings {
 class _GermanStrings extends AppStrings {
   const _GermanStrings() : super._('de');
 
+  @override String get feedback => 'Feedback';
+  @override String get sounds => 'Töne';
+  @override String get haptics => 'Haptik';
+
   @override String get welcomeTitle => 'Fotos aufräumen';
   @override String get welcomeSubtitle =>
       'CleanFotos findet doppelte und ähnliche Fotos und hilft dir, sie schnell zu löschen.';
@@ -394,6 +405,10 @@ class _GermanStrings extends AppStrings {
 // ─── French ───────────────────────────────────────────────────────────────────
 class _FrenchStrings extends AppStrings {
   const _FrenchStrings() : super._('fr');
+
+  @override String get feedback => 'Retours';
+  @override String get sounds => 'Sons';
+  @override String get haptics => 'Vibrations';
 
   @override String get welcomeTitle => 'Nettoyez vos photos';
   @override String get welcomeSubtitle =>
@@ -502,6 +517,10 @@ class _FrenchStrings extends AppStrings {
 class _PortugueseStrings extends AppStrings {
   const _PortugueseStrings() : super._('pt');
 
+  @override String get feedback => 'Sons e vibração';
+  @override String get sounds => 'Sons';
+  @override String get haptics => 'Vibração';
+
   @override String get welcomeTitle => 'Organize suas fotos';
   @override String get welcomeSubtitle =>
       'CleanFotos encontra fotos duplicadas e similares e ajuda você a deletá-las rapidamente.';
@@ -609,6 +628,10 @@ class _PortugueseStrings extends AppStrings {
 class _ItalianStrings extends AppStrings {
   const _ItalianStrings() : super._('it');
 
+  @override String get feedback => 'Feedback';
+  @override String get sounds => 'Suoni';
+  @override String get haptics => 'Vibrazione';
+
   @override String get welcomeTitle => 'Pulisci le tue foto';
   @override String get welcomeSubtitle =>
       'CleanFotos trova le tue foto duplicate e simili e ti aiuta a eliminarle velocemente.';
@@ -715,6 +738,10 @@ class _ItalianStrings extends AppStrings {
 // ─── Polish ─────────────────────────────────────────────────────────────────
 class _PolishStrings extends AppStrings {
   const _PolishStrings() : super._('pl');
+
+  @override String get feedback => 'Dźwięk i wibracje';
+  @override String get sounds => 'Dźwięki';
+  @override String get haptics => 'Wibracje';
 
   @override String get welcomeTitle => 'Uporządkuj swoje zdjęcia';
   @override String get welcomeSubtitle =>
