@@ -1,4 +1,5 @@
 import 'package:photo_manager/photo_manager.dart';
+import '../utils/format.dart' as fmt;
 
 /// Average photo size used for fast size/savings estimates (~3.5 MB), so we
 /// never have to read photo files (which is slow on Android).
@@ -56,15 +57,9 @@ class PhotoGroup {
     );
   }
 
-  /// Shared byte formatter (KB/MB/GB).
-  static String formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
+  /// Shared byte formatter (KB/MB/GB) — see [fmt.formatBytes].
+  static String formatBytes(int bytes, [String lang = 'en']) =>
+      fmt.formatBytes(bytes, lang);
 }
 
 /// Statistics about the user's photo library.

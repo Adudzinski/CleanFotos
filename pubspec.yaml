@@ -96,17 +96,17 @@ flutter:
 
 # Launch/splash screen — run: dart run flutter_native_splash:create
 flutter_native_splash:
-  # Light mode
-  color: "#EFEEFC"
+  # Noir (1.3) is dark-only, so the launch screen is Noir.bg in both modes —
+  # no light flash before the first frame.
+  color: "#0A0A0C"
   image: assets/icon/splash_logo.png
-  # Dark mode — matches the system theme so the launch screen isn't a light flash
-  color_dark: "#12111C"
+  color_dark: "#0A0A0C"
   image_dark: assets/icon/splash_logo.png
   android_12:
     image: assets/icon/splash_a12.png
-    icon_background_color: "#EFEEFC"
+    icon_background_color: "#0A0A0C"
     image_dark: assets/icon/splash_a12.png
-    icon_background_color_dark: "#12111C"
+    icon_background_color_dark: "#0A0A0C"
   android: true
   ios: true
   web: false

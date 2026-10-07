@@ -695,10 +695,6 @@ class AppProvider extends ChangeNotifier {
     await prefs.setString('theme_pref', value);
   }
 
-  /// Called by the app root when the system brightness changes, so screens
-  /// rebuild with the updated AppTheme palette.
-  void refreshTheme() => notifyListeners();
-
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   String get freedFormatted => _formatBytes(freedBytes);
