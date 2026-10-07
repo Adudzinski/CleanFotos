@@ -181,6 +181,8 @@ class AppStrings {
   String get homeTitle => 'Clean up your library';
   String tabPhotos(String n) => 'Photos · $n';
   String tabVideos(String n) => 'Videos · $n';
+  /// The Videos tab before we're allowed to count them.
+  String get videosLabel => 'Videos';
   String get upToDate => 'Up to date · checked just now';
   String checkedAgo(int m) => 'Up to date · checked $m min ago';
   String get lookingForNew => 'Looking for new photos…';
@@ -322,6 +324,7 @@ class _SpanishStrings extends AppStrings {
   @override String get homeTitle => 'Limpia tu galería';
   @override String tabPhotos(String n) => 'Fotos · $n';
   @override String tabVideos(String n) => 'Videos · $n';
+  @override String get videosLabel => 'Videos';
   @override String get upToDate => 'Al día · revisado ahora mismo';
   @override String checkedAgo(int m) => 'Al día · revisado hace $m min';
   @override String get lookingForNew => 'Buscando fotos nuevas…';
@@ -516,6 +519,7 @@ class _GermanStrings extends AppStrings {
   @override String get homeTitle => 'Räume deine Mediathek auf';
   @override String tabPhotos(String n) => 'Fotos · $n';
   @override String tabVideos(String n) => 'Videos · $n';
+  @override String get videosLabel => 'Videos';
   @override String get upToDate => 'Aktuell · gerade geprüft';
   @override String checkedAgo(int m) => 'Aktuell · vor $m Min. geprüft';
   @override String get lookingForNew => 'Suche nach neuen Fotos…';
@@ -704,6 +708,7 @@ class _FrenchStrings extends AppStrings {
   @override String get homeTitle => 'Faites le tri dans votre photothèque';
   @override String tabPhotos(String n) => 'Photos · $n';
   @override String tabVideos(String n) => 'Vidéos · $n';
+  @override String get videosLabel => 'Vidéos';
   @override String get upToDate => 'À jour · vérifié à l’instant';
   @override String checkedAgo(int m) => 'À jour · vérifié il y a $m min';
   @override String get lookingForNew => 'Recherche de nouvelles photos…';
@@ -898,6 +903,7 @@ class _PortugueseStrings extends AppStrings {
   @override String get homeTitle => 'Organize sua galeria';
   @override String tabPhotos(String n) => 'Fotos · $n';
   @override String tabVideos(String n) => 'Vídeos · $n';
+  @override String get videosLabel => 'Vídeos';
   @override String get upToDate => 'Atualizado · verificado agora';
   @override String checkedAgo(int m) => 'Atualizado · verificado há $m min';
   @override String get lookingForNew => 'Procurando fotos novas…';
@@ -1092,6 +1098,7 @@ class _ItalianStrings extends AppStrings {
   @override String get homeTitle => 'Fai pulizia nella libreria';
   @override String tabPhotos(String n) => 'Foto · $n';
   @override String tabVideos(String n) => 'Video · $n';
+  @override String get videosLabel => 'Video';
   @override String get upToDate => 'Aggiornato · controllato ora';
   @override String checkedAgo(int m) => 'Aggiornato · controllato $m min fa';
   @override String get lookingForNew => 'Cerco nuove foto…';
@@ -1293,6 +1300,7 @@ class _PolishStrings extends AppStrings {
   @override String get homeTitle => 'Uporządkuj bibliotekę';
   @override String tabPhotos(String n) => 'Zdjęcia · $n';
   @override String tabVideos(String n) => 'Filmy · $n';
+  @override String get videosLabel => 'Filmy';
   @override String get upToDate => 'Aktualne · sprawdzono przed chwilą';
   @override String checkedAgo(int m) => 'Aktualne · sprawdzono $m min temu';
   @override String get lookingForNew => 'Szukam nowych zdjęć…';

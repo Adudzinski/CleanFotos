@@ -1,57 +1,67 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
+import '../l10n/strings.dart';
+import '../models/delete_result.dart';
 import '../models/photo_group.dart';
 import '../providers/app_provider.dart';
+import '../services/feedback_service.dart';
+import '../theme/noir.dart';
 import '../utils/asset_utils.dart';
-import '../theme/app_theme.dart';
-import '../widgets/photo_card.dart';
-import '../widgets/celebration_overlay.dart';
-import '../widgets/idle_gesture_hint.dart';
-import '../l10n/strings.dart';
+import '../utils/format.dart';
+import '../utils/video_utils.dart';
+import '../widgets/noir/noir_widgets.dart';
+import '../widgets/photo_card.dart' show PhotoDetailDialog;
+import 'session.dart';
 
-/// Picture Group's accent — a deeper rose, same family as Picture Swipe's pink.
-const Color kPictureGroupAccent = Color(0xFFE8537A);
-
+/// "Similar shots" / "Similar clips" — one time-group at a time; tap the
+/// items you don't want (REDESIGN_1.3_PLAN.md §5.4).
+///
+/// Navigation is explicit: "Keep all · Next" / "Delete n · Next" and a
+/// Previous button. (The overscroll navigation and idle hints of 1.2 were
+/// removed on purpose.) Marks go into the provider's persisted queue when the
+/// user moves on, and everything is deleted in ONE system prompt at Finish.
 class GroupReviewScreen extends StatefulWidget {
   final List<PhotoGroup> groups;
+  final int startIndex;
+  final MediaKind kind;
 
-  const GroupReviewScreen({super.key, required this.groups});
+  const GroupReviewScreen({
+    super.key,
+    required this.groups,
+    this.startIndex = 0,
+    this.kind = MediaKind.photos,
+  });
 
   @override
   State<GroupReviewScreen> createState() => _GroupReviewScreenState();
 }
 
 class _GroupReviewScreenState extends State<GroupReviewScreen> {
-  late List<PhotoGroup> _groups;
-  int _currentIndex = 0;
-
-  /// All photos in the current group (scrollable). Shrinks as photos are deleted.
-  final List<AssetEntity> _photos = [];
-  /// Selected for deletion
-  final Set<String> _selectedIds = {};
-
-  /// See note in home_screen: CelebrationOverlay.of() looks up the tree, so
-  /// a GlobalKey is required to reach the overlay this screen builds.
-  final GlobalKey<CelebrationOverlayState> _celebrationKey =
-      GlobalKey<CelebrationOverlayState>();
-
-  /// True while the single end-of-session delete is running.
-  bool _isCommitting = false;
-
-  /// Grid scrolling + how far the user has pulled past either end.
-  final ScrollController _scroll = ScrollController();
-  double _overscroll = 0;
-  /// Guards against the iOS bounce re-triggering navigation.
-  bool _navLock = false;
-
-  /// How far past the edge you must pull to flip to the next/previous group.
-  static const double _kOverscrollTrigger = 90;
-
-  /// Kept from initState: dispose() must not look the provider up via context.
   late final AppProvider _provider;
+  late final List<PhotoGroup> _groups = List.of(widget.groups);
+  late int _index = widget.startIndex.clamp(0, widget.groups.length - 1);
+
+  /// Marked in the current group.
+  final Set<String> _selected = {};
+  bool _finishing = false;
+
+  bool get _isVideo => widget.kind == MediaKind.videos;
+  PhotoGroup get _group => _groups[_index];
+  bool get _isLast => _index >= _groups.length - 1;
+
+  final ScrollController _scroll = ScrollController();
+
+  // ── Hold-to-play (videos), inline in the tile ────────────────────────────
+  // One player at a time, built on long-press and torn down on release, so
+  // we never hold N players in memory.
+  String? _playingId;
+  VideoPlayerController? _playCtrl;
+  bool _playReady = false;
 
   @override
   void initState() {
@@ -59,414 +69,410 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     _provider = context.read<AppProvider>();
     // Holds the background library re-scan back until we're done.
     _provider.inCleanupSession = true;
-    _groups = List.from(widget.groups);
-    _loadGroup(0);
+    _loadGroup();
   }
 
   @override
   void dispose() {
     _provider.inCleanupSession = false;
+    _playCtrl?.removeListener(_onTick);
+    _playCtrl?.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  void _loadGroup(int index) {
-    if (index >= _groups.length) return;
-    _selectedIds.clear();
-    _photos
+  /// Show the group with whatever is already queued pre-marked, so going
+  /// back to a group shows what will be deleted.
+  void _loadGroup() {
+    _selected
       ..clear()
-      ..addAll(_groups[index].assets);
+      ..addAll(_group.assets.where((a) => _provider.isQueued(a.id)).map((a) => a.id));
+    if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  PhotoGroup get _currentGroup => _groups[_currentIndex];
-
-  bool get _hasMore => _currentIndex < _groups.length - 1;
-
-  void _toggleSelect(AssetEntity asset) {
+  void _toggle(AssetEntity asset) {
     setState(() {
-      if (_selectedIds.contains(asset.id)) {
-        _selectedIds.remove(asset.id);
+      if (_selected.remove(asset.id)) {
+        FeedbackService.instance.play(Fx.unmark);
       } else {
-        _selectedIds.add(asset.id);
+        _selected.add(asset.id);
+        FeedbackService.instance.play(Fx.mark);
       }
     });
   }
 
-  /// Mark the current selection for deletion.
-  ///
-  /// Nothing leaves the device yet: the marks are persisted and everything is
-  /// deleted in ONE system prompt when the user exits. Persisting means a
-  /// force-quit can't lose the work — the next launch finishes it.
-  void _queueSelected() {
-    if (_selectedIds.isEmpty) return;
-    final picked =
-        _photos.where((a) => _selectedIds.contains(a.id)).toList();
-    if (picked.isEmpty) return;
-
+  /// Sync this group's marks into the persisted queue: queue what's marked,
+  /// take back anything unmarked. Returns how many items are newly queued.
+  int _queueSelected() {
+    final picked = _group.assets.where((a) => _selected.contains(a.id)).toList();
+    final unpicked = _group.assets
+        .where((a) => !_selected.contains(a.id) && _provider.isQueued(a.id))
+        .toList();
+    final fresh = picked.where((a) => !_provider.isQueued(a.id)).length;
     // Persist the marks immediately. The OS confirmation can only be shown by
     // a foreground app, so if the user force-quits mid-session we finish the
     // job on next launch instead of silently losing their work.
-    final provider = context.read<AppProvider>();
-    unawaited(provider.queueForDeletion(picked));
-    final s = AppStrings.of(provider.languageCode);
-    _celebrationKey.currentState?.celebrate(
-        s.freedLabel(_formatBytes(picked.length * kAvgPhotoBytes)));
-
-    setState(() {
-      final queued = Set<String>.from(_selectedIds);
-      _photos.removeWhere((a) => queued.contains(a.id));
-      _selectedIds.clear();
-    });
+    if (picked.isNotEmpty) {
+      unawaited(_provider.queueForDeletion(picked, notify: false));
+    }
+    if (unpicked.isNotEmpty) {
+      unawaited(_provider.unqueueDeletion(unpicked, notify: false));
+    }
+    return fresh;
   }
 
-  /// Delete everything marked this session — one system prompt, on exit.
-  Future<void> _commitDeletions() async {
-    if (_isCommitting) return;
-    _isCommitting = true;
-    await context.read<AppProvider>().flushPendingDeletions();
-    _isCommitting = false;
-  }
-
-  /// Leave Group Review, committing queued deletions first.
-  Future<void> _exitGroupReview() async {
-    await _commitDeletions();
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  /// Move to the next group, queueing anything selected on the way out.
-  void _advanceGroup() {
-    _queueSelected();
-    if (_hasMore) {
-      setState(() {
-        _currentIndex++;
-        _loadGroup(_currentIndex);
-      });
-      _resetScroll();
+  Future<void> _next() async {
+    if (_finishing) return;
+    await _stopPlay();
+    final count = _selected.length;
+    final fresh = _queueSelected();
+    if (count > 0) {
+      FeedbackService.instance.play(Fx.groupDone);
+      if (fresh > 0 && mounted) {
+        final avg = _isVideo ? kAvgVideoBytes : _provider.avgPhotoBytes;
+        NoirToast.show(context,
+            AppStrings.of(_provider.languageCode).markedToast(
+                formatBytes(fresh * avg, _provider.languageCode)));
+      }
     } else {
-      _exitGroupReview();
+      FeedbackService.instance.play(Fx.groupKeep);
     }
-  }
-
-  /// Move back to the previous group, queueing anything selected first.
-  void _previousGroup() {
-    _queueSelected();
-    if (_currentIndex == 0) return;
+    if (_isLast) {
+      await _finish(resume: null);
+      return;
+    }
     setState(() {
-      _currentIndex--;
-      _loadGroup(_currentIndex);
+      _index++;
+      _loadGroup();
     });
-    _resetScroll();
   }
 
-  void _resetScroll() {
-    _overscroll = 0;
-    _navLock = false;
-    if (_scroll.hasClients) _scroll.jumpTo(0);
+  Future<void> _previous() async {
+    if (_index == 0 || _finishing) return;
+    await _stopPlay();
+    _queueSelected();
+    FeedbackService.instance.play(Fx.tap);
+    setState(() {
+      _index--;
+      _loadGroup();
+    });
   }
 
-  /// Detect a pull past either end of the grid and turn it into group
-  /// navigation. This must handle BOTH scroll physics:
-  ///
-  ///  • Android (ClampingScrollPhysics) never scrolls past the edge and instead
-  ///    reports OverscrollNotification deltas.
-  ///  • iOS (BouncingScrollPhysics) lets the position travel beyond the edge
-  ///    and emits almost no overscroll notifications — so we measure how far
-  ///    past the extent we are instead. Without this, the gesture silently did
-  ///    nothing on iPhone.
-  bool _onScrollNotification(ScrollNotification n) {
-    if (n is ScrollEndNotification) {
-      _overscroll = 0;
-      _navLock = false;
-      return false;
-    }
-    if (_navLock) return false;
-
-    final m = n.metrics;
-    double past = 0;
-    if (m.pixels > m.maxScrollExtent) {
-      past = m.pixels - m.maxScrollExtent;
-    } else if (m.pixels < m.minScrollExtent) {
-      past = m.pixels - m.minScrollExtent;
-    }
-
-    if (past != 0) {
-      _overscroll = past; // iOS: absolute overshoot
-    } else if (n is OverscrollNotification) {
-      _overscroll += n.overscroll; // Android: accumulated deltas
-    }
-
-    if (_overscroll > _kOverscrollTrigger) {
-      _overscroll = 0;
-      _navLock = true; // don't re-fire while the bounce settles
-      _advanceGroup();
-    } else if (_overscroll < -_kOverscrollTrigger) {
-      _overscroll = 0;
-      _navLock = true;
-      _previousGroup();
-    }
-    return false;
+  /// The X / back button. What's marked in the current group counts too —
+  /// "finish" means "I'm done, delete what I marked".
+  Future<void> _finishFromHeader() async {
+    if (_finishing) return;
+    await _stopPlay();
+    _queueSelected();
+    final first = _group.assets.first;
+    await _finish(
+        resume: ResumePoint(assetId: first.id, time: librarySortTime(first)));
   }
+
+  Future<void> _finish({required ResumePoint? resume}) async {
+    if (_finishing) return;
+    _finishing = true;
+    await finishSession(context,
+        provider: _provider, kind: widget.kind, resume: resume);
+    if (mounted) _finishing = false;
+  }
+
+  // ── Video playback ───────────────────────────────────────────────────────
+
+  Future<void> _startPlay(AssetEntity asset) async {
+    await _stopPlay();
+    if (!mounted) return;
+    setState(() {
+      _playingId = asset.id;
+      _playReady = false;
+    });
+    try {
+      final ctrl = await buildAssetVideoController(asset);
+      if (ctrl == null) return;
+      // The user may have let go while the controller was loading.
+      if (!mounted || _playingId != asset.id) {
+        await ctrl.dispose();
+        return;
+      }
+      _playCtrl = ctrl;
+      await ctrl.initialize();
+      await ctrl.setLooping(true);
+      await ctrl.setVolume(1.0);
+      if (!mounted || _playingId != asset.id) {
+        await ctrl.dispose();
+        _playCtrl = null;
+        return;
+      }
+      ctrl.addListener(_onTick);
+      await ctrl.play();
+      if (mounted) setState(() => _playReady = true);
+    } catch (_) {
+      if (mounted) setState(() => _playReady = false);
+    }
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _stopPlay() async {
+    final c = _playCtrl;
+    _playCtrl = null;
+    _playReady = false;
+    _playingId = null;
+    if (c != null) {
+      c.removeListener(_onTick);
+      await c.pause();
+      await c.dispose();
+    }
+    if (mounted) setState(() {});
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final s = AppStrings.of(provider.languageCode);
+    final group = _group;
+    final newest = group.assets
+        .map(librarySortTime)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    final n = group.assets.length;
+    final marked = _selected.length;
 
-    if (_groups.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: Text(s.groupMode)),
-        body: Center(child: Text(s.allClean)),
-      );
+    final String cta;
+    if (marked == 0) {
+      cta = _isLast ? s.keepAllFinish : s.keepAllNext;
+    } else {
+      cta = _isLast ? s.deleteFinish(marked) : s.deleteNext(marked);
     }
-
-    final group = _currentGroup;
-    final remaining = _photos.length;
-    final totalInGroup = group.totalCount;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _exitGroupReview();
+        if (!didPop) _finishFromHeader();
       },
-      child: CelebrationOverlay(
-      key: _celebrationKey,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
-        appBar: _buildAppBar(context, s),
-        body: IdleGestureHint(
-          tapHint: s.idleTapHintPhotos,
-          swipeHint: s.idleSwipeHint,
-          child: Column(
-          children: [
-            // Progress
-            _buildProgressBar(context, s),
-
-            // Group info bar
-            _buildGroupInfo(context, group, totalInGroup, remaining, s),
-
-            // Photo grid
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: _buildPhotoGrid(context, s),
-              ),
-            ),
-
-            // Bottom action bar
-            _buildActionBar(context, s),
-          ],
-        ),
-        ),
-      ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(BuildContext context, AppStrings s) {
-    return AppBar(
-      title: Text(s.groupMode),
-      leading: IconButton(
-        icon: const Icon(Icons.close),
-        onPressed: _exitGroupReview,
-      ),
-    );
-  }
-
-  Widget _buildProgressBar(BuildContext context, AppStrings s) {
-    final progress = _groups.isEmpty
-        ? 1.0
-        : (_currentIndex + 1) / widget.groups.length;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-      color: AppTheme.surface,
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                s.groupOf(
-                    _currentIndex + 1, widget.groups.length),
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textSecondary),
-              ),
-              Text(
-                '${(progress * 100).toInt()}%',
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: kPictureGroupAccent),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: kPictureGroupAccent.withValues(alpha: 0.15),
-              valueColor:
-                  const AlwaysStoppedAnimation<Color>(kPictureGroupAccent),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGroupInfo(BuildContext context, PhotoGroup group,
-      int totalInGroup, int remaining, AppStrings s) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      color: AppTheme.surface,
-      child: Row(
-        children: [
-          Expanded(
+        backgroundColor: Noir.bg,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  _formatDate(_groupDisplayDate(group)),
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                if (group.location != null) ...[
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on_outlined,
-                          size: 13, color: AppTheme.textSecondary),
-                      const SizedBox(width: 3),
-                      Text(group.location!,
-                          style: TextStyle(
-                              fontSize: 16,
-                              color: AppTheme.textSecondary)),
-                    ],
+                NoirHeader(
+                  leading: NoirIconButton(
+                    icon: Icons.close_rounded,
+                    semanticLabel: s.finish,
+                    onPressed: _finishFromHeader,
                   ),
-                ],
+                  title: s.shortDate(newest, withTime: true),
+                  subtitle: _isVideo ? s.similarClipsCount(n) : s.similarCount(n),
+                  trailing: Text('${_index + 1} / ${_groups.length}',
+                      style: NoirText.caption
+                          .copyWith(fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(height: 12),
+                ProgressTrack(value: (_index + 1) / _groups.length),
+                const SizedBox(height: 14),
+                Text(_isVideo ? s.tapToMarkVideos : s.tapToMark,
+                    style: NoirText.secondary
+                        .copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: GridView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.only(bottom: 16),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                    itemCount: n,
+                    itemBuilder: (context, i) {
+                      final asset = group.assets[i];
+                      final playing = _playingId == asset.id;
+                      return _Tile(
+                        asset: asset,
+                        isVideo: _isVideo,
+                        marked: _selected.contains(asset.id),
+                        onTap: () => _toggle(asset),
+                        onHoldStart: _isVideo
+                            ? () => _startPlay(asset)
+                            : () => PhotoDetailDialog.show(context, asset),
+                        onHoldEnd: _isVideo ? _stopPlay : null,
+                        controller: playing && _playReady ? _playCtrl : null,
+                        loading: playing && !_playReady,
+                      );
+                    },
+                  ),
+                ),
+                Row(
+                  children: [
+                    NoirButton.secondary(
+                      icon: Icons.chevron_left_rounded,
+                      semanticLabel: s.previousGroup,
+                      onPressed: _index == 0 ? null : _previous,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: marked == 0
+                          ? NoirButton.primary(label: cta, onPressed: _next)
+                          : NoirButton.danger(label: cta, onPressed: _next),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
+}
 
-  Widget _buildPhotoGrid(BuildContext context, AppStrings s) {
-    // All photos in the group, in a scrollable grid (same tile size as before).
-    return NotificationListener<ScrollNotification>(
-      onNotification: _onScrollNotification,
-      child: GridView.builder(
-      controller: _scroll,
-      // Always scrollable so an overscroll gesture exists even when the group
-      // has too few photos to fill the screen.
-      physics: const AlwaysScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.92,
-      ),
-      padding: const EdgeInsets.only(bottom: 12),
-      itemCount: _photos.length,
-      itemBuilder: (context, i) {
-        final asset = _photos[i];
-        final selected = _selectedIds.contains(asset.id);
-        return PhotoCard(
-          asset: asset,
-          selected: selected,
-          onTap: () => _toggleSelect(asset),
-          onLongPress: () => PhotoDetailDialog.show(context, asset),
-        );
-      },
-      ),
-    );
-  }
+/// Square grid tile. Marked = red border, dimmed image, trash badge.
+/// Videos play inline while held.
+class _Tile extends StatelessWidget {
+  final AssetEntity asset;
+  final bool isVideo;
+  final bool marked;
+  final VoidCallback onTap;
+  final VoidCallback onHoldStart;
+  final VoidCallback? onHoldEnd;
+  final VideoPlayerController? controller;
+  final bool loading;
 
-  Widget _buildActionBar(BuildContext context, AppStrings s) {
-    final selectedCount = _selectedIds.length;
-    final hasSelection = selectedCount > 0;
+  const _Tile({
+    required this.asset,
+    required this.isVideo,
+    required this.marked,
+    required this.onTap,
+    required this.onHoldStart,
+    this.onHoldEnd,
+    this.controller,
+    this.loading = false,
+  });
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
+  @override
+  Widget build(BuildContext context) {
+    final playing = controller != null;
+    final media = playing
+        ? FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller!.value.size.width == 0
+                  ? 200
+                  : controller!.value.size.width,
+              height: controller!.value.size.height == 0
+                  ? 200
+                  : controller!.value.size.height,
+              child: VideoPlayer(controller!),
+            ),
+          )
+        : AssetEntityImage(
+            asset,
+            isOriginal: false,
+            thumbnailSize: const ThumbnailSize.square(400),
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: Noir.surface2,
+              child: Icon(
+                  isVideo
+                      ? Icons.videocam_off_outlined
+                      : Icons.broken_image_outlined,
+                  color: Noir.faint),
+            ),
+          );
+
+    return Semantics(
+      button: true,
+      selected: marked,
+      child: GestureDetector(
+        onTap: onTap,
+        onLongPressStart: (_) => onHoldStart(),
+        onLongPressEnd: onHoldEnd == null ? null : (_) => onHoldEnd!(),
+        onLongPressCancel: onHoldEnd,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: Noir.surface,
+            borderRadius: BorderRadius.circular(Noir.rCard),
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            s.recoverHint,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 16, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 12),
-          // One action only. "Next" is gone: swipe right, or pull past the
-          // top/bottom of the grid, to move between groups — anything marked
-          // is queued automatically.
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: hasSelection ? _advanceGroup : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.danger,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppTheme.danger.withOpacity(0.4),
-                disabledForegroundColor: Colors.white70,
-                minimumSize: const Size.fromHeight(56),
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-                textStyle: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              icon: const Icon(Icons.delete_outline, size: 20),
-              label: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  hasSelection ? s.deleteCount(selectedCount) : s.deleteBtn,
-                  maxLines: 1,
-                ),
-              ),
+          // Painted over the photo, so an unmarked tile has no inset rim.
+          foregroundDecoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Noir.rCard),
+            border: Border.all(
+              color: marked ? Noir.danger : Colors.transparent,
+              width: 3,
             ),
           ),
-        ],
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              AnimatedOpacity(
+                opacity: marked && !playing ? 0.45 : 1,
+                duration: const Duration(milliseconds: 150),
+                child: media,
+              ),
+              if (isVideo && !playing)
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      shape: BoxShape.circle,
+                    ),
+                    child: loading
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.2, color: Colors.white),
+                          )
+                        : const Icon(Icons.play_arrow_rounded,
+                            color: Colors.white, size: 28),
+                  ),
+                ),
+              if (isVideo)
+                Positioned(
+                  left: 8,
+                  bottom: 8,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: ShapeDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      shape: const StadiumBorder(),
+                    ),
+                    child: Text(formatVideoDuration(asset.videoDuration),
+                        style: const TextStyle(
+                            fontFamily: NoirText.family,
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              if (marked)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: const BoxDecoration(
+                        color: Noir.danger, shape: BoxShape.circle),
+                    child: const Icon(Icons.delete_outline_rounded,
+                        color: Colors.white, size: 16),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
-  }
-
-  DateTime _groupDisplayDate(PhotoGroup group) {
-    return group.assets
-        .map(librarySortTime)
-        .reduce((a, b) => a.isAfter(b) ? a : b);
-  }
-
-  String _formatDate(DateTime dt) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

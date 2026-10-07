@@ -182,22 +182,24 @@ class ProgressTrack extends StatelessWidget {
   Widget build(BuildContext context) {
     final v = value.isNaN ? 0.0 : value.clamp(0.0, 1.0);
     final reduceMotion = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    return LayoutBuilder(builder: (context, c) {
-      return Container(
-        height: height,
-        decoration: const ShapeDecoration(
-            color: Noir.surface2, shape: StadiumBorder()),
+    // No LayoutBuilder here: the track sits inside SliverFillRemaining, which
+    // asks its child for intrinsic sizes, and LayoutBuilder can't give them.
+    return Container(
+      height: height,
+      decoration:
+          const ShapeDecoration(color: Noir.surface2, shape: StadiumBorder()),
+      alignment: Alignment.centerLeft,
+      child: AnimatedFractionallySizedBox(
+        duration:
+            reduceMotion ? Duration.zero : const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
         alignment: Alignment.centerLeft,
-        child: AnimatedContainer(
-          duration: reduceMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-          width: c.maxWidth * v,
-          height: height,
+        widthFactor: v,
+        heightFactor: 1,
+        child: DecoratedBox(
           decoration: ShapeDecoration(color: color, shape: const StadiumBorder()),
         ),
-      );
-    });
+      ),
+    );
   }
 }

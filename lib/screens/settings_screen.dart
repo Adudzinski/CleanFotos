@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../l10n/strings.dart';
 import '../providers/app_provider.dart';
 import '../services/ad_service.dart';
 import '../services/feedback_service.dart';
 import '../services/purchase_service.dart';
 import '../services/review_service.dart';
-import '../theme/app_theme.dart';
-import '../l10n/strings.dart';
+import '../theme/noir.dart';
+import '../utils/format.dart';
+import '../widgets/noir/noir_widgets.dart';
+import 'milestones_screen.dart';
 
 // The website path moved from /cleanpics/ to /cleanfotos/. The old paths are
 // still served (Firebase rewrite, HTTP 200) so already-installed builds keep
@@ -19,6 +22,12 @@ const String kDeleteDataUrl = 'https://crocodata.net/cleanfotos/delete-data.html
 const String kTermsUrl = 'https://crocodata.net/cleanfotos/terms.html';
 const String kContactEmail = 'contact@crocodata.net';
 
+/// Shown under About. Keep in step with `version:` in pubspec.yaml
+/// (package_info_plus isn't a dependency).
+const String kAppVersion = '1.3.0';
+
+/// Settings (REDESIGN_1.3_PLAN.md §5.7): Feedback, Progress, Language,
+/// Remove ads, About.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -26,209 +35,175 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final s = AppStrings.of(provider.languageCode);
+    final lang = provider.languageCode;
 
     return Scaffold(
-      appBar: AppBar(title: Text(s.settings)),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          // ── Stats Card ────────────────────────────────────────────────────
-          _sectionHeader(s.statistics),
-          _statsCard(context, provider, s),
+      backgroundColor: Noir.bg,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          children: [
+            NoirHeader(
+              leading: NoirIconButton(
+                icon: Icons.chevron_left_rounded,
+                semanticLabel: s.back,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: s.settings,
+            ),
 
-          const SizedBox(height: 24),
+            // ── Feedback ──────────────────────────────────────────────────
+            _Section(s.feedback),
+            NoirCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                children: [
+                  _SwitchRow(
+                    label: s.sounds,
+                    value: provider.soundsEnabled,
+                    onChanged: (v) {
+                      provider.setSoundsEnabled(v);
+                      FeedbackService.instance.play(Fx.tap);
+                    },
+                  ),
+                  const _Divider(),
+                  _SwitchRow(
+                    label: s.haptics,
+                    value: provider.hapticsEnabled,
+                    onChanged: (v) {
+                      provider.setHapticsEnabled(v);
+                      FeedbackService.instance.play(Fx.tap);
+                    },
+                  ),
+                ],
+              ),
+            ),
 
-          // ── Language ─────────────────────────────────────────────────────
-          _sectionHeader(s.language),
-          _languageCard(context, provider, s),
+            // ── Progress ──────────────────────────────────────────────────
+            _Section(s.progress),
+            NoirCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                children: [
+                  _Row(
+                    label: s.milestones,
+                    trailing: const Icon(Icons.chevron_right_rounded,
+                        color: Noir.muted),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const MilestonesScreen()),
+                    ),
+                  ),
+                  const _Divider(),
+                  _Row(
+                    label: s.freedSpace,
+                    value: formatBytes(provider.freedBytes, lang),
+                  ),
+                  const _Divider(),
+                  _Row(
+                    label: s.deletedPhotos,
+                    value: formatCount(provider.deletedCount, lang),
+                  ),
+                ],
+              ),
+            ),
 
-          const SizedBox(height: 24),
+            // ── Language ──────────────────────────────────────────────────
+            _Section(s.language),
+            _languageCard(provider),
 
-          // ── Feedback (sounds + haptics) ───────────────────────────────────
-          _sectionHeader(s.feedback),
-          _feedbackCard(context, provider, s),
+            // ── Remove ads ────────────────────────────────────────────────
+            _Section(s.removeAds),
+            _proCard(context, provider, s),
 
-          const SizedBox(height: 24),
-
-          // ── Remove Ads ────────────────────────────────────────────────────
-          _sectionHeader(s.removeAds),
-          _proCard(context, provider, s),
-
-          const SizedBox(height: 24),
-
-          // ── About ─────────────────────────────────────────────────────────
-          _sectionHeader(s.about),
-          _aboutCard(context, provider, s),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionHeader(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(
-        text.toUpperCase(),
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
-          color: AppTheme.textSecondary,
+            // ── About ─────────────────────────────────────────────────────
+            _Section(s.about),
+            NoirCard(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Column(
+                children: [
+                  _Row(
+                    label: s.rateApp,
+                    trailing: const Icon(Icons.star_outline_rounded,
+                        size: 20, color: Noir.muted),
+                    onTap: () => ReviewService.instance.openStoreListing(),
+                  ),
+                  const _Divider(),
+                  _Row(
+                    label: s.privacyPolicy,
+                    trailing: const Icon(Icons.open_in_new_rounded,
+                        size: 18, color: Noir.muted),
+                    onTap: _openPrivacyPolicy,
+                  ),
+                  // Always offered to non-Pro users so EEA users can change
+                  // consent even if UMP hasn't flagged the form as required.
+                  if (!provider.isPro) ...[
+                    const _Divider(),
+                    _Row(
+                      label: s.privacyOptions,
+                      trailing: const Icon(Icons.tune_rounded,
+                          size: 18, color: Noir.muted),
+                      onTap: () =>
+                          AdService.instance.showPrivacyOptionsForm(),
+                    ),
+                  ],
+                  const _Divider(),
+                  _Row(label: s.appVersion, value: kAppVersion),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _statsCard(
-      BuildContext context, AppProvider provider, AppStrings s) {
-    final stats = provider.stats;
-    return _card(
-      child: Column(
-        children: [
-          _statRow(
-            context,
-            icon: Icons.photo_library_outlined,
-            label: s.totalPhotos,
-            value: '${stats.totalPhotos}',
-            color: AppTheme.primary,
-          ),
-          _divider(),
-          _statRow(
-            context,
-            icon: Icons.storage_outlined,
-            label: s.librarySize,
-            value: stats.totalSizeFormatted,
-            color: const Color(0xFF43A8D0),
-          ),
-          _divider(),
-          _statRow(
-            context,
-            icon: Icons.content_copy_outlined,
-            label: s.similarGroups,
-            value: '${stats.duplicateGroups}',
-            color: AppTheme.secondary,
-          ),
-          _divider(),
-          _statRow(
-            context,
-            icon: Icons.savings_outlined,
-            label: s.couldSave,
-            value: stats.savingsFormatted,
-            color: AppTheme.success,
-          ),
-          _divider(),
-          _statRow(
-            context,
-            icon: Icons.delete_forever_outlined,
-            label: s.freedSpace,
-            value: provider.freedFormatted,
-            color: AppTheme.success,
-          ),
-          _divider(),
-          _statRow(
-            context,
-            icon: Icons.check_circle_outline,
-            label: s.deletedPhotos,
-            value: '${provider.deletedCount}',
-            color: AppTheme.success,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _languageCard(
-      BuildContext context, AppProvider provider, AppStrings s) {
-    final languages = [
-      {'code': 'en', 'name': '🇬🇧 English'},
-      {'code': 'es', 'name': '🇪🇸 Español'},
-      {'code': 'de', 'name': '🇩🇪 Deutsch'},
-      {'code': 'fr', 'name': '🇫🇷 Français'},
-      {'code': 'pt', 'name': '🇧🇷 Português'},
-      {'code': 'it', 'name': '🇮🇹 Italiano'},
-      {'code': 'pl', 'name': '🇵🇱 Polski'},
+  Widget _languageCard(AppProvider provider) {
+    const languages = [
+      ('en', 'English'),
+      ('es', 'Español'),
+      ('de', 'Deutsch'),
+      ('fr', 'Français'),
+      ('pt', 'Português'),
+      ('it', 'Italiano'),
+      ('pl', 'Polski'),
     ];
-
-    return _card(
-      child: Column(
-        children: languages.map((lang) {
-          final selected = provider.languageCode == lang['code'];
-          return InkWell(
-            onTap: () => provider.setLanguage(lang['code']!),
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-              child: Row(
-                children: [
-                  Text(lang['name']!,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w400,
-                        color: selected
-                            ? AppTheme.primary
-                            : AppTheme.textPrimary,
-                      )),
-                  const Spacer(),
-                  if (selected)
-                    const Icon(Icons.check_circle,
-                        color: AppTheme.primary, size: 22),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _feedbackCard(
-      BuildContext context, AppProvider provider, AppStrings s) {
-    return _card(
+    return NoirCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(s.sounds, style: const TextStyle(fontSize: 17)),
-            value: provider.soundsEnabled,
-            onChanged: (v) {
-              provider.setSoundsEnabled(v);
-              FeedbackService.instance.play(Fx.tap);
-            },
-          ),
-          _divider(),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(s.haptics, style: const TextStyle(fontSize: 17)),
-            value: provider.hapticsEnabled,
-            onChanged: (v) {
-              provider.setHapticsEnabled(v);
-              FeedbackService.instance.play(Fx.tap);
-            },
-          ),
+          for (var i = 0; i < languages.length; i++) ...[
+            if (i > 0) const _Divider(),
+            _Row(
+              label: languages[i].$2,
+              bold: provider.languageCode == languages[i].$1,
+              trailing: provider.languageCode == languages[i].$1
+                  ? const Icon(Icons.check_rounded,
+                      size: 20, color: Noir.text)
+                  : null,
+              onTap: () {
+                FeedbackService.instance.play(Fx.tap);
+                provider.setLanguage(languages[i].$1);
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _proCard(
-      BuildContext context, AppProvider provider, AppStrings s) {
-    // Already unlocked
+  Widget _proCard(BuildContext context, AppProvider provider, AppStrings s) {
     if (provider.isPro) {
-      return _card(
+      return NoirCard(
         child: Row(
           children: [
-            const Icon(Icons.workspace_premium,
-                color: AppTheme.success, size: 28),
-            const SizedBox(width: 14),
+            const Icon(Icons.workspace_premium_outlined,
+                color: Noir.text, size: 24),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(s.proUnlocked,
-                  style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary)),
+                  style: NoirText.body.copyWith(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
@@ -236,30 +211,22 @@ class SettingsScreen extends StatelessWidget {
     }
 
     final purchase = PurchaseService.instance;
-    return _card(
+    return NoirCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.workspace_premium,
-                  color: AppTheme.primary, size: 26),
-              const SizedBox(width: 12),
-              Text(s.proTitle,
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(s.proDesc,
-              style: TextStyle(
-                  fontSize: 16,
-                  color: AppTheme.textSecondary,
-                  height: 1.4)),
-          const SizedBox(height: 14),
-          ElevatedButton.icon(
-            // Never disable this: a dead button looks broken (and App Review
-            // flagged exactly that). If the product hasn't loaded yet we
+          Text(s.proTitle, style: NoirText.h2),
+          const SizedBox(height: 6),
+          Text(s.proDesc, style: NoirText.secondary),
+          const SizedBox(height: 16),
+          NoirButton.primary(
+            // Google/Apple return the price already localized; show
+            // "Remove Ads" (no price) until it loads.
+            label: purchase.price != null
+                ? s.proButton(purchase.price!)
+                : s.proButtonNoPrice,
+            // Never disabled: a dead button looks broken (and App Review
+            // flagged exactly that). If the product hasn't loaded we
             // re-query on tap, then explain if it's still unavailable.
             onPressed: () async {
               if (purchase.isAvailable) {
@@ -276,95 +243,16 @@ class SettingsScreen extends StatelessWidget {
                 SnackBar(content: Text(s.proUnavailable)),
               );
             },
-            icon: const Icon(Icons.block, size: 20),
-            // Google returns the price already localized to the user's currency;
-            // show "Remove Ads" (no price) until it loads.
-            label: Text(purchase.price != null
-                ? s.proButton(purchase.price!)
-                : s.proButtonNoPrice),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-            ),
           ),
+          const SizedBox(height: 4),
           // Always offer Restore — Apple requires a restore path for
           // non-consumable purchases, and hiding it fails review.
-          Center(
-              child: TextButton(
-                onPressed: () => purchase.restore(),
-                child: Text(s.restorePurchase,
-                    style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600)),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _aboutCard(
-      BuildContext context, AppProvider provider, AppStrings s) {
-    // Always offer this for non-Pro users so EEA testers can fix consent even
-    // if UMP hasn't marked privacy-options as "required" yet.
-    final showPrivacyOptions = !provider.isPro;
-
-    return _card(
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () => ReviewService.instance.openStoreListing(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  Text(s.rateApp,
-                      style: TextStyle(
-                          fontSize: 17, color: AppTheme.textSecondary)),
-                  const Spacer(),
-                  const Icon(Icons.star_rounded,
-                      size: 22, color: AppTheme.primary),
-                ],
-              ),
-            ),
+          NoirButton.ghost(
+            label: s.restorePurchase,
+            height: 44,
+            textStyle: NoirText.meta,
+            onPressed: () => purchase.restore(),
           ),
-          _divider(),
-          InkWell(
-            onTap: _openPrivacyPolicy,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  Text(s.privacyPolicy,
-                      style: TextStyle(
-                          fontSize: 17, color: AppTheme.textSecondary)),
-                  const Spacer(),
-                  Icon(Icons.open_in_new,
-                      size: 20, color: AppTheme.textSecondary),
-                ],
-              ),
-            ),
-          ),
-          if (showPrivacyOptions) ...[
-            _divider(),
-            InkWell(
-              onTap: () => AdService.instance.showPrivacyOptionsForm(),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Row(
-                  children: [
-                    Text(s.privacyOptions,
-                        style: TextStyle(
-                            fontSize: 17, color: AppTheme.textSecondary)),
-                    const Spacer(),
-                    Icon(Icons.tune,
-                        size: 20, color: AppTheme.textSecondary),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -376,68 +264,102 @@ class SettingsScreen extends StatelessWidget {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
+}
 
-  Widget _statRow(BuildContext context,
-      {required IconData icon,
-      required String label,
-      required String value,
-      required Color color}) {
+class _Section extends StatelessWidget {
+  final String text;
+  const _Section(this.text);
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 22, color: color),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(label,
-                style: TextStyle(
-                    fontSize: 17, color: AppTheme.textSecondary)),
-          ),
-          const SizedBox(width: 8),
-          Text(value,
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: color)),
-        ],
+      padding: const EdgeInsets.fromLTRB(4, 28, 4, 10),
+      child: Semantics(
+        header: true,
+        child: Text(text.toUpperCase(), style: NoirText.label),
       ),
     );
   }
+}
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Text(label,
-              style: TextStyle(
-                  fontSize: 17, color: AppTheme.textSecondary)),
-          const Spacer(),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 17, fontWeight: FontWeight.w600)),
-        ],
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, thickness: 1, color: Color(0x0FFFFFFF));
+}
+
+class _Row extends StatelessWidget {
+  final String label;
+  final String? value;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool bold;
+
+  const _Row({
+    required this.label,
+    this.value,
+    this.trailing,
+    this.onTap,
+    this.bold = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(label,
+                    style: NoirText.body.copyWith(
+                        fontWeight: bold ? FontWeight.w600 : FontWeight.w400)),
+              ),
+              if (value != null) ...[
+                const SizedBox(width: 12),
+                Text(value!,
+                    style: NoirText.body.copyWith(color: Noir.muted)),
+              ],
+              if (trailing != null) ...[
+                const SizedBox(width: 8),
+                trailing!,
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
+}
 
-  Widget _divider() => Divider(height: 1, color: AppTheme.divider);
+class _SwitchRow extends StatelessWidget {
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
 
-  Widget _card({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primary.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  const _SwitchRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MergeSemantics(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 52),
+        child: Row(
+          children: [
+            Expanded(child: Text(label, style: NoirText.body)),
+            Switch(value: value, onChanged: onChanged),
+          ],
+        ),
       ),
-      child: child,
     );
   }
 }

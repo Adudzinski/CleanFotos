@@ -15,6 +15,7 @@ import '../services/feedback_service.dart';
 import '../services/notification_service.dart';
 import '../services/photo_service.dart';
 import '../services/purchase_service.dart';
+import '../services/video_service.dart';
 import '../utils/asset_utils.dart';
 import '../utils/format.dart' as fmt;
 
@@ -24,6 +25,7 @@ enum AppState { initial, loading, ready, permissionDenied, error }
 
 class AppProvider extends ChangeNotifier {
   final PhotoService _service = PhotoService();
+  final VideoService _videoService = VideoService();
 
   AppState state = AppState.initial;
   List<PhotoGroup> groups = [];
@@ -125,12 +127,15 @@ class AppProvider extends ChangeNotifier {
 
   /// Ask for notification permission and schedule the seasonal reminders —
   /// but only once, and only after the user has actually cleaned something up,
-  /// so the request arrives when the app has demonstrated its value.
-  Future<void> maybeSetupReminders() async {
+  /// so the request arrives when the app has demonstrated its value. Home
+  /// calls it after the user leaves the Finished screen, never over it.
+  /// Returns true if it asked just now.
+  Future<bool> maybeSetupReminders() async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_kRemindersSetUp) ?? false) return;
+    if (prefs.getBool(_kRemindersSetUp) ?? false) return false;
     await prefs.setBool(_kRemindersSetUp, true);
     await _setupReminders();
+    return true;
   }
 
   Future<void> _setupReminders() async {
@@ -225,6 +230,11 @@ class AppProvider extends ChangeNotifier {
 
     try {
       _totalPhotos = await _service.totalCount();
+      // Best effort: without video access (Android 13+) this is just 0 and
+      // the Videos tab shows no count until access is granted.
+      try {
+        videoCount = await _videoService.totalCount();
+      } catch (_) {}
       stats = _service.estimateStats(_totalPhotos, groups);
       state = AppState.ready;
       notifyListeners();
@@ -293,8 +303,9 @@ class AppProvider extends ChangeNotifier {
 
   void _onLibraryChanged(MethodCall call) {
     _libraryStale = true;
-    // Videos aren't part of the photo scan and are re-read every time a video
-    // mode opens; only their grouping is cached, so just drop it.
+    // Videos aren't part of the photo scan: drop the cached list and grouping
+    // so they're re-read on next use (Home re-requests them when visible).
+    videosLoaded = false;
     videoGroupsLoaded = false;
     // Changes arrive in bursts (a burst shot, an iCloud sync) — wait for quiet.
     _scheduleReload(const Duration(milliseconds: 1500));
@@ -363,8 +374,8 @@ class AppProvider extends ChangeNotifier {
         groupsLoaded = true;
         _totalPhotos = all.length;
         stats = _service.estimateStats(_totalPhotos, groups);
-        // Video groups rebuild lazily from a fresh video list on next use.
-        videoGroups = [];
+        // Videos are re-read lazily (from a fresh list) on next use.
+        videosLoaded = false;
         videoGroupsLoaded = false;
         _fingerprint = fingerprint;
       }
@@ -426,23 +437,65 @@ class AppProvider extends ChangeNotifier {
     return allPhotos;
   }
 
-  /// Load the photo library and group it by time — on demand, and cached so it
-  /// only runs once per scan. Call this when the user opens a cleanup mode
-  /// (group review / swipe). Returns the resulting groups.
-  /// Time-grouped VIDEOS, cached like [ensureGroups]. Reuses the same grouping
-  /// algorithm — it works on any asset list, not just photos.
+  // ─── Videos ───────────────────────────────────────────────────────────────
+  // Videos need their own permission on Android 13+, so they're loaded only
+  // once the user opens the Videos tab, then cached like the photos.
+
+  /// Null until the Videos tab asked for access.
+  VideoAccess? videoAccess;
+  bool get hasVideoAccess =>
+      videoAccess == VideoAccess.granted || videoAccess == VideoAccess.limited;
+
+  /// Every video, newest first. Valid while [videosLoaded].
+  List<AssetEntity> allVideos = [];
+  bool videosLoaded = false;
+  int videoCount = 0;
+  Future<List<AssetEntity>>? _videosFuture;
+
+  /// Time-grouped videos (same grouping as photos), cached.
   List<PhotoGroup> videoGroups = [];
   bool videoGroupsLoaded = false;
 
-  Future<List<PhotoGroup>> ensureVideoGroups(List<AssetEntity> videos) async {
-    if (videoGroupsLoaded) return videoGroups;
+  /// Ask for video access (prompts when needed). Starts loading the videos
+  /// when granted.
+  Future<VideoAccess> requestVideoAccess() async {
+    final access = await _videoService.ensureAccess();
+    videoAccess = access;
+    notifyListeners();
+    if (hasVideoAccess) unawaited(ensureVideos());
+    return access;
+  }
+
+  Future<void> openVideoSettings() => _videoService.openSettings();
+
+  /// Load every video (cached), then group them. Concurrent callers share one
+  /// load.
+  Future<List<AssetEntity>> ensureVideos() {
+    if (videosLoaded) return Future.value(allVideos);
+    return _videosFuture ??= _loadVideos().whenComplete(() => _videosFuture = null);
+  }
+
+  Future<List<AssetEntity>> _loadVideos() async {
     try {
+      final videos = await _videoService.loadAllVideos();
+      allVideos = videos;
+      videoCount = videos.length;
+      videosLoaded = true;
       videoGroups = await _service.groupAssets(videos);
       videoGroupsLoaded = true;
     } catch (e) {
-      debugPrint('ensureVideoGroups failed: $e');
+      debugPrint('ensureVideos failed: $e');
     }
     notifyListeners();
+    return allVideos;
+  }
+
+  Future<List<PhotoGroup>> ensureVideoGroups() async {
+    await ensureVideos();
+    if (!videoGroupsLoaded) {
+      videoGroups = await _service.groupAssets(allVideos);
+      videoGroupsLoaded = true;
+    }
     return videoGroups;
   }
 
@@ -571,6 +624,9 @@ class AppProvider extends ChangeNotifier {
 
   bool get hasPendingDeletions => _pendingDeleteIds.isNotEmpty;
   int get pendingDeleteCount => _pendingDeleteIds.length;
+
+  /// Whether [id] is currently marked for deletion.
+  bool isQueued(String id) => _pendingDeleteIds.contains(id);
 
   /// Remember items marked for deletion so a crash/force-quit can't lose them.
   ///
@@ -728,9 +784,11 @@ class AppProvider extends ChangeNotifier {
     var freed = 0;
     var measuredPhotoBytes = 0;
     var measuredPhotoCount = 0;
+    var deletedPhotos = 0;
     for (final a in toDelete) {
       if (!deletedSet.contains(a.id)) continue;
       final isVideo = a.type == AssetType.video;
+      if (!isVideo) deletedPhotos++;
       final measured = measuredBytes[a.id];
       freed += measured ?? (isVideo ? kAvgVideoBytes : avgPhotoBytes);
       if (measured != null && !isVideo) {
@@ -750,14 +808,16 @@ class AppProvider extends ChangeNotifier {
     await prefs.setInt(_kMeasuredCount, _measuredCount);
     final newMilestone = await _checkMilestones(prefs);
 
-    // The user has now cleaned something up, so this is a much better moment
-    // to ask about notifications than a cold first launch.
-    unawaited(maybeSetupReminders());
-
     // Remove the actually-deleted assets from the cached lists.
     if (photosLoaded) {
       allPhotos =
           allPhotos.where((a) => !deletedSet.contains(a.id)).toList();
+    }
+    if (videosLoaded) {
+      final before = allVideos.length;
+      allVideos =
+          allVideos.where((a) => !deletedSet.contains(a.id)).toList();
+      videoCount = (videoCount - (before - allVideos.length)).clamp(0, 1 << 31);
     }
     videoGroups = videoGroups
         .map((g) => g.copyWith(
@@ -775,7 +835,7 @@ class AppProvider extends ChangeNotifier {
         .toList();
 
     // Keep the library count and stats in sync with what was just removed.
-    _totalPhotos = (_totalPhotos - deletedIds.length).clamp(0, _totalPhotos);
+    _totalPhotos = (_totalPhotos - deletedPhotos).clamp(0, _totalPhotos);
     stats = _service.estimateStats(_totalPhotos, groups);
 
     notifyListeners();

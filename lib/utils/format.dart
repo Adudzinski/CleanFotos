@@ -25,7 +25,20 @@ String formatCount(int n, [String lang = 'en']) {
   return negative ? '-$buf' : buf.toString();
 }
 
-String _fixed(double v, int decimals, String lang) {
+/// How [formatBytes] rounds. Progress towards a target rounds [down] (so it
+/// never shows "100 MB of 100 MB" before the tier is reached) and the
+/// remainder rounds [up].
+enum ByteRounding { nearest, down, up }
+
+String _fixed(double v, int decimals, String lang,
+    [ByteRounding rounding = ByteRounding.nearest]) {
+  if (rounding != ByteRounding.nearest) {
+    final f = decimals == 0 ? 1 : 10;
+    // Tiny epsilon so 2.0000001 doesn't round up to 2.1.
+    v = rounding == ByteRounding.down
+        ? (v * f + 1e-9).floorToDouble() / f
+        : (v * f - 1e-9).ceilToDouble() / f;
+  }
   final s = v.toStringAsFixed(decimals);
   if (decimals == 0) {
     return formatCount(int.parse(s), lang);
@@ -40,15 +53,16 @@ const int _gb = 1024 * 1024 * 1024;
 
 /// Bytes as KB / MB / GB. One decimal below 10 (so small numbers stay
 /// meaningful: "3,5 MB"), whole numbers above ("28 MB", "52 GB").
-String formatBytes(int bytes, [String lang = 'en']) {
+String formatBytes(int bytes,
+    [String lang = 'en', ByteRounding rounding = ByteRounding.nearest]) {
   if (bytes <= 0) return '0 MB';
-  if (bytes < _mb) return '${_fixed(bytes / _kb, 0, lang)} KB';
+  if (bytes < _mb) return '${_fixed(bytes / _kb, 0, lang, rounding)} KB';
   if (bytes < _gb) {
     final mb = bytes / _mb;
-    return '${_fixed(mb, mb < 10 ? 1 : 0, lang)} MB';
+    return '${_fixed(mb, mb < 10 ? 1 : 0, lang, rounding)} MB';
   }
   final gb = bytes / _gb;
-  return '${_fixed(gb, gb < 10 ? 1 : 0, lang)} GB';
+  return '${_fixed(gb, gb < 10 ? 1 : 0, lang, rounding)} GB';
 }
 
 /// Round to two significant figures: 33 → 33, 143 → 140, 1427 → 1,400.

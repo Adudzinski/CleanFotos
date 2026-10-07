@@ -29,6 +29,15 @@ void main() {
       expect(formatBytes((1.25 * _gb).round()), '1.3 GB');
       expect(formatBytes(52 * _gb), '52 GB');
     });
+
+    test('rounding modes', () {
+      final almost100 = 104800000; // 99.95 MB
+      expect(formatBytes(almost100), '100 MB');
+      expect(formatBytes(almost100, 'en', ByteRounding.down), '99 MB');
+      expect(formatBytes(57600, 'en', ByteRounding.up), '57 KB');
+      expect(formatBytes(2 * _mb, 'en', ByteRounding.up), '2.0 MB');
+      expect(formatBytes(100 * _mb, 'en', ByteRounding.down), '100 MB');
+    });
   });
 
   group('roundTo2Sig', () {

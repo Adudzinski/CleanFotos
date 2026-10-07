@@ -3,77 +3,101 @@ import 'dart:async' show unawaited;
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:provider/provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:video_player/video_player.dart';
+import '../l10n/strings.dart';
+import '../models/delete_result.dart';
 import '../models/photo_group.dart';
 import '../providers/app_provider.dart';
 import '../services/ad_service.dart';
+import '../services/feedback_service.dart';
+import '../theme/noir.dart';
 import '../utils/asset_utils.dart';
-import '../theme/app_theme.dart';
-import '../widgets/celebration_overlay.dart';
-import '../l10n/strings.dart';
+import '../utils/format.dart';
+import '../utils/video_utils.dart';
+import '../widgets/noir/noir_widgets.dart';
+import 'session.dart';
 
+/// "One by one" — every photo (or video), newest first, one card at a time
+/// (REDESIGN_1.3_PLAN.md §5.3).
+///
+/// Swipe left / Delete marks the item; right / Keep moves on. Marks are
+/// persisted immediately (a force-quit can't lose them) and deleted in ONE
+/// system prompt when the user finishes. Undo walks back up to 50 decisions.
 class SwipeScreen extends StatefulWidget {
-  /// Every photo, newest-first — Picture Swipe lets the user swipe through the
-  /// whole library, not just duplicates.
+  /// Newest first (sorted by the provider).
   final List<AssetEntity> photos;
+  final int startIndex;
+  final MediaKind kind;
 
-  const SwipeScreen({super.key, required this.photos});
+  const SwipeScreen({
+    super.key,
+    required this.photos,
+    this.startIndex = 0,
+    this.kind = MediaKind.photos,
+  });
 
   @override
   State<SwipeScreen> createState() => _SwipeScreenState();
 }
 
+class _Decision {
+  final int index;
+  final bool deleted;
+  const _Decision(this.index, this.deleted);
+}
+
 class _SwipeScreenState extends State<SwipeScreen>
     with TickerProviderStateMixin {
-  /// CelebrationOverlay.of() searches ancestors, but the overlay is built
-  /// below this State's context — use a GlobalKey to reach it.
-  final GlobalKey<CelebrationOverlayState> _celebrationKey =
-      GlobalKey<CelebrationOverlayState>();
+  static const double _threshold = 100;
+  static const int _maxHistory = 50;
+  static const String _kHintSeen = 'swipe_hint_seen';
 
-  // Flatten all duplicate assets into one queue, newest first
-  late final List<AssetEntity> _queue;
-  int _current = 0;
-
-  // Drag state
-  double _dragX = 0;
-  double _dragY = 0;
-  bool _isDragging = false;
-
-  // Decision animation
-  late AnimationController _flyOut;
-  late Animation<Offset> _flyOffset;
-  late Animation<double> _flyRotation;
-  bool _flyingLeft = false;
-
-  // When the back card becomes front, scale it up smoothly instead of jumping
-  // wider (back and front must share the same outer padding).
-  late AnimationController _promote;
-  late Animation<double> _promoteScale;
-  static const EdgeInsets _cardPadding =
-      EdgeInsets.symmetric(horizontal: 16, vertical: 20);
-  static const double _backCardScale = 0.94;
-
-  int _deletedCount = 0;
-  int _freedBytes = 0;
-
-  // Photos swiped to delete are queued and removed in ONE batch (a single
-  // system permission dialog) when the user finishes or leaves.
-  final List<AssetEntity> _pendingDelete = [];
   late final AppProvider _provider;
+  late final List<AssetEntity> _items = List.of(widget.photos);
+  late int _current = widget.startIndex.clamp(0, widget.photos.length);
 
-  // ── In-deck native ad ──────────────────────────────────────────────────────
-  // Every [_adInterval] swipes, an ad card is slipped into the deck. Swiping it
-  // (either direction) just dismisses it — nothing is deleted and it doesn't
-  // count toward the photo queue.
-  static const int _adInterval = 12;
+  bool get _isVideo => widget.kind == MediaKind.videos;
+  bool get _done => _current >= _items.length;
+
+  /// Ids marked this session (also in the provider's persisted queue).
+  final Set<String> _marked = {};
+  final List<_Decision> _history = [];
+  int _reviewed = 0;
+
+  // ── Drag + fly animation ─────────────────────────────────────────────────
+  Offset _drag = Offset.zero;
+  bool _pastThreshold = false;
+  late final AnimationController _fly = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  Animation<Offset>? _flyAnim;
+  bool _busy = false;
+  bool _finishing = false;
+
+  Offset get _offset => _flyAnim?.value ?? _drag;
+
+  // ── First-run hint ───────────────────────────────────────────────────────
+  bool _showHint = false;
+
+  // ── In-deck native ad ────────────────────────────────────────────────────
+  // Every [_adInterval] decisions an ad card is slipped in. Either button or
+  // swipe direction just dismisses it — nothing is deleted, nothing counted,
+  // and Undo skips it.
+  int get _adInterval => _isVideo ? 5 : 12;
   NativeAd? _nativeAd;
   bool _nativeAdLoaded = false;
   bool _showingAd = false;
-  int _swipesSinceAd = 0;
-  bool _isCommitting = false;
-  bool _deletionsCommitted = false;
+  int _sinceAd = 0;
+
+  // ── Video ────────────────────────────────────────────────────────────────
+  VideoPlayerController? _videoCtrl;
+  String? _videoFor;
+  bool _videoReady = false;
 
   @override
   void initState() {
@@ -81,31 +105,38 @@ class _SwipeScreenState extends State<SwipeScreen>
     _provider = context.read<AppProvider>();
     // Holds the background library re-scan back until we're done.
     _provider.inCleanupSession = true;
-    // Newest-in-library first (sorted in [AppProvider.ensurePhotos]).
-    _queue = List.of(widget.photos);
-
-    _flyOut = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 320),
-    );
-    _flyOffset = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(2.5, -0.5),
-    ).animate(CurvedAnimation(parent: _flyOut, curve: Curves.easeIn));
-    _flyRotation = Tween<double>(begin: 0, end: 0.4).animate(
-      CurvedAnimation(parent: _flyOut, curve: Curves.easeIn),
-    );
-    _promote = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
-    );
-    _promoteScale = Tween<double>(begin: _backCardScale, end: 1.0).animate(
-      CurvedAnimation(parent: _promote, curve: Curves.easeOut),
-    );
-    _promote.value = 1.0; // first card starts at full size
-
+    _fly.addListener(() => setState(() {}));
+    _loadHintFlag();
     if (_provider.adsEnabled) _maybeLoadNativeAd();
+    _prepareVideo();
   }
+
+  @override
+  void dispose() {
+    _provider.inCleanupSession = false;
+    _fly.dispose();
+    _nativeAd?.dispose();
+    _videoCtrl?.dispose();
+    super.dispose();
+  }
+
+  bool get _reduceMotion => MediaQuery.disableAnimationsOf(context);
+
+  Future<void> _loadHintFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(_kHintSeen) ?? false) && mounted) {
+      setState(() => _showHint = true);
+    }
+  }
+
+  Future<void> _hideHint() async {
+    if (!_showHint) return;
+    setState(() => _showHint = false);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kHintSeen, true);
+  }
+
+  // ── Ads ──────────────────────────────────────────────────────────────────
 
   Future<void> _maybeLoadNativeAd() async {
     await AdService.instance.init();
@@ -113,51 +144,31 @@ class _SwipeScreenState extends State<SwipeScreen>
     _loadNativeAd();
   }
 
-  void _playPromoteAnimation() => _promote.forward(from: 0);
-
-  @override
-  void dispose() {
-    if (!_deletionsCommitted && _pendingDelete.isNotEmpty) {
-      _commitDeletions();
-    }
-    // After the commit above: its flush is already under way, so the re-scan
-    // this releases waits for the delete instead of racing it.
-    _provider.inCleanupSession = false;
-    _flyOut.dispose();
-    _promote.dispose();
-    _nativeAd?.dispose();
-    super.dispose();
-  }
-
-  /// Pre-load a native ad so a filled ad card is ready when its slot comes up.
   void _loadNativeAd() {
-    if (!AdService.instance.canRequestAds) return;
+    if (!AdService.instance.canRequestAds || _provider.isPro) return;
     final unitId = AdService.nativeUnitId;
     final ad = NativeAd(
       adUnitId: unitId,
       request: const AdRequest(),
       nativeTemplateStyle: NativeTemplateStyle(
         templateType: TemplateType.medium,
-        mainBackgroundColor: const Color(0xFF15151C),
+        mainBackgroundColor: Noir.surface,
+        cornerRadius: 16,
         callToActionTextStyle: NativeTemplateTextStyle(
-          textColor: Colors.white,
-          backgroundColor: AppTheme.primary,
+          textColor: Noir.onAccent,
+          backgroundColor: Noir.accent,
           style: NativeTemplateFontStyle.bold,
           size: 16,
         ),
         primaryTextStyle: NativeTemplateTextStyle(
-          textColor: Colors.white,
+          textColor: Noir.text,
           style: NativeTemplateFontStyle.bold,
           size: 17,
         ),
-        secondaryTextStyle: NativeTemplateTextStyle(
-          textColor: Colors.white70,
-          size: 15,
-        ),
-        tertiaryTextStyle: NativeTemplateTextStyle(
-          textColor: Colors.white54,
-          size: 14,
-        ),
+        secondaryTextStyle:
+            NativeTemplateTextStyle(textColor: Noir.muted, size: 15),
+        tertiaryTextStyle:
+            NativeTemplateTextStyle(textColor: Noir.muted, size: 14),
       ),
       listener: NativeAdListener(
         onAdLoaded: (_) {
@@ -176,625 +187,546 @@ class _SwipeScreenState extends State<SwipeScreen>
     ad.load();
   }
 
-  /// Called after every photo swipe: slip the ad card in when it's due & ready.
-  void _maybeShowAd() {
-    if (_done || _showingAd) return;
-    if (_swipesSinceAd >= _adInterval && _nativeAdLoaded) {
-      setState(() {
-        _showingAd = true;
-        _swipesSinceAd = 0;
-      });
-    }
-  }
-
-  /// Fly the ad card off-screen, then resume the photo deck and pre-load the
-  /// next ad.
-  Future<void> _dismissAd({required bool toLeft}) async {
-    _flyOffset = Tween<Offset>(
-      begin: Offset(_dragX / 300, _dragY / 300),
-      end: Offset(toLeft ? -3 : 3, -0.3),
-    ).animate(CurvedAnimation(parent: _flyOut, curve: Curves.easeIn));
-    _flyRotation =
-        Tween<double>(begin: _dragX / 1000, end: toLeft ? -0.5 : 0.5).animate(
-      CurvedAnimation(parent: _flyOut, curve: Curves.easeIn),
-    );
-    await _flyOut.forward(from: 0);
-    _flyOut.reset();
-
+  void _dismissAd() {
     _nativeAd?.dispose();
     _nativeAd = null;
     _nativeAdLoaded = false;
-
-    setState(() {
-      _showingAd = false;
-      _dragX = 0;
-      _dragY = 0;
-      _isDragging = false;
-    });
-
-    _playPromoteAnimation();
+    _showingAd = false;
     _loadNativeAd();
   }
 
-  /// Delete all queued photos in one batch (one permission dialog).
-  /// Returns true if everything was deleted or the queue was empty.
-  Future<bool> _commitDeletions({bool showError = true}) async {
-    if (_pendingDelete.isEmpty) {
-      _deletionsCommitted = true;
-      return true;
-    }
-    if (_isCommitting) return false;
-    _isCommitting = true;
+  // ── Video ────────────────────────────────────────────────────────────────
 
-    final batchCount = _pendingDelete.length;
-    final batchBytes = batchCount * kAvgPhotoBytes;
-    _pendingDelete.clear();
-
-    // Delete through the provider's persisted queue rather than a local list.
-    // Every swipe-left already wrote its id there, so if the app is killed
-    // while the OS prompt is up the marks survive and Home picks them up next
-    // launch. flushPendingDeletions() clears them only once the user has
-    // actually answered.
-    final result = await _provider.flushPendingDeletions();
-    _isCommitting = false;
-
-    if (!result.confirmed) {
-      // The user declined the system prompt. Do NOT re-queue the batch: it
-      // would be retried from dispose() and they'd be asked a second time
-      // for the same photos. One "no" is enough — the photos simply stay.
-      _deletionsCommitted = true;
-      _deletedCount = (_deletedCount - batchCount).clamp(0, _deletedCount);
-      _freedBytes = (_freedBytes - batchBytes).clamp(0, _freedBytes);
-      // When the user is on their way out we skip the error banner — they
-      // declined on purpose, and a message on a disappearing screen just
-      // flashes an ugly box.
-      if (mounted && showError) {
-        final s = AppStrings.of(_provider.languageCode);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(s.deleteFailed)),
-        );
+  Future<void> _prepareVideo() async {
+    if (!_isVideo) return;
+    final target = (_done || _showingAd) ? null : _items[_current];
+    if (target?.id == _videoFor) return;
+    final old = _videoCtrl;
+    _videoCtrl = null;
+    _videoReady = false;
+    _videoFor = target?.id;
+    await old?.dispose();
+    if (target == null) return;
+    try {
+      final ctrl = await buildAssetVideoController(target);
+      if (ctrl == null) return;
+      if (!mounted || _videoFor != target.id) {
+        await ctrl.dispose();
+        return;
       }
-      return false;
+      _videoCtrl = ctrl;
+      await ctrl.initialize();
+      await ctrl.setLooping(true);
+      await ctrl.setVolume(1.0);
+      if (mounted && _videoFor == target.id) {
+        setState(() => _videoReady = true);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _videoReady = false);
+    }
+  }
+
+  void _play() => _videoCtrl?.play().then((_) {
+        if (mounted) setState(() {});
+      });
+
+  void _pause() {
+    _videoCtrl?.pause();
+    if (mounted) setState(() {});
+  }
+
+  // ── Decisions ────────────────────────────────────────────────────────────
+
+  Future<void> _animate(Offset from, Offset to) async {
+    if (_reduceMotion) return;
+    _flyAnim = Tween(begin: from, end: to)
+        .animate(CurvedAnimation(parent: _fly, curve: Curves.easeOutCubic));
+    await _fly.forward(from: 0);
+    _flyAnim = null;
+  }
+
+  Future<void> _decide({required bool delete}) async {
+    if (_busy || _done || _finishing) return;
+    _busy = true;
+    final width = MediaQuery.sizeOf(context).width;
+    final out = Offset((delete ? -1.4 : 1.4) * width, _drag.dy + 40);
+
+    if (_showingAd) {
+      await _animate(_drag, out);
+      if (!mounted) return;
+      setState(() {
+        _dismissAd();
+        _drag = Offset.zero;
+        _pastThreshold = false;
+      });
+      _busy = false;
+      _prepareVideo();
+      return;
     }
 
-    _deletionsCommitted = true;
-    return true;
-  }
+    FeedbackService.instance.play(delete ? Fx.delete : Fx.keep);
+    _hideHint();
+    _pause();
+    await _animate(_drag, out);
+    if (!mounted) return;
 
-  /// Leave the deck. If the user declines the system delete prompt we still
-  /// go back Home — trapping them on the swipe screen (with only an error
-  /// snackbar) felt broken.
-  Future<void> _exitSwipe() async {
-    if (_isCommitting) return;
-    await _commitDeletions(showError: false);
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  bool get _done => _current >= _queue.length;
-
-  Future<void> _swipeLeft() async {
-    // Delete
-    _flyingLeft = true;
-    _flyOffset = Tween<Offset>(
-      begin: Offset(_dragX / 300, _dragY / 300),
-      end: const Offset(-3, -0.3),
-    ).animate(CurvedAnimation(parent: _flyOut, curve: Curves.easeIn));
-    _flyRotation = Tween<double>(begin: _dragX / 1000, end: -0.5).animate(
-      CurvedAnimation(parent: _flyOut, curve: Curves.easeIn),
-    );
-    await _flyOut.forward(from: 0);
-    _flyOut.reset();
-
-    // Queue for batch deletion (don't hit the OS dialog per swipe).
-    _pendingDelete.add(_queue[_current]);
-    // Also persist the mark immediately. _pendingDelete only lives in this
-    // widget's memory, so a force-quit mid-session would lose it silently;
-    // the provider writes the id to disk, letting Home offer to finish the
-    // cleanup next launch. Fire-and-forget so the swipe stays instant.
-    unawaited(_provider.queueForDeletion([_queue[_current]], notify: false));
-    _deletedCount++;
-    _freedBytes += kAvgPhotoBytes;
-
-    final s = AppStrings.of(_provider.languageCode);
-    _celebrationKey.currentState
-        ?.celebrate(s.freedLabel(_formatBytes(kAvgPhotoBytes)));
+    final asset = _items[_current];
+    if (delete) {
+      _marked.add(asset.id);
+      // Persist the mark right away so a force-quit can't lose it; Home
+      // offers to finish the job next launch. Fire-and-forget keeps the swipe
+      // instant (the in-memory queue updates synchronously).
+      unawaited(_provider.queueForDeletion([asset], notify: false));
+    }
+    _history.add(_Decision(_current, delete));
+    if (_history.length > _maxHistory) _history.removeAt(0);
 
     setState(() {
       _current++;
-      _dragX = 0;
-      _dragY = 0;
-      _isDragging = false;
+      _reviewed++;
+      _drag = Offset.zero;
+      _pastThreshold = false;
+      _sinceAd++;
+      if (!_done && _sinceAd >= _adInterval && _nativeAdLoaded) {
+        _showingAd = true;
+        _sinceAd = 0;
+      }
     });
-
-    _swipesSinceAd++;
-    _maybeShowAd();
-    if (!_showingAd) _playPromoteAnimation();
-
-    if (_current >= _queue.length) await _commitDeletions();
+    _busy = false;
+    _prepareVideo();
+    if (_done) _finish();
   }
 
-  void _swipeRight() async {
-    // Keep (skip)
-    _flyingLeft = false;
-    _flyOffset = Tween<Offset>(
-      begin: Offset(_dragX / 300, _dragY / 300),
-      end: const Offset(3, -0.3),
-    ).animate(CurvedAnimation(parent: _flyOut, curve: Curves.easeIn));
-    _flyRotation = Tween<double>(begin: _dragX / 1000, end: 0.5).animate(
-      CurvedAnimation(parent: _flyOut, curve: Curves.easeIn),
-    );
-    await _flyOut.forward(from: 0);
-    _flyOut.reset();
-
+  Future<void> _undo() async {
+    if (_busy || _history.isEmpty || _finishing) return;
+    _busy = true;
+    final d = _history.removeLast();
+    final asset = _items[d.index];
+    FeedbackService.instance.play(Fx.undo);
+    if (d.deleted) {
+      _marked.remove(asset.id);
+      unawaited(_provider.unqueueDeletion([asset], notify: false));
+    }
+    final width = MediaQuery.sizeOf(context).width;
     setState(() {
-      _current++;
-      _dragX = 0;
-      _dragY = 0;
-      _isDragging = false;
+      // An ad card on screen is simply dropped — ads are never undone.
+      if (_showingAd) _showingAd = false;
+      _current = d.index;
+      _reviewed = (_reviewed - 1).clamp(0, _reviewed);
+      _drag = Offset.zero;
+      _pastThreshold = false;
     });
+    _prepareVideo();
+    // Slide the card back in from the side it left.
+    await _animate(Offset((d.deleted ? -1.4 : 1.4) * width, 40), Offset.zero);
+    _busy = false;
+  }
 
-    _swipesSinceAd++;
-    _maybeShowAd();
-    if (!_showingAd) _playPromoteAnimation();
-
-    if (_current >= _queue.length) await _commitDeletions();
+  Future<void> _finish() async {
+    if (_finishing) return;
+    _finishing = true;
+    _pause();
+    final resume = _done
+        ? null
+        : ResumePoint(
+            assetId: _items[_current].id,
+            time: librarySortTime(_items[_current]));
+    await finishSession(context,
+        provider: _provider, kind: widget.kind, resume: resume);
+    // Still here (e.g. the route wasn't replaced) — allow another try.
+    if (mounted) _finishing = false;
   }
 
   void _onDragUpdate(DragUpdateDetails d) {
-    setState(() {
-      _dragX += d.delta.dx;
-      _dragY += d.delta.dy;
-      _isDragging = true;
-    });
+    if (_busy) return;
+    setState(() => _drag += d.delta);
+    final past = _drag.dx.abs() > _threshold;
+    if (past != _pastThreshold) {
+      _pastThreshold = past;
+      FeedbackService.instance.play(Fx.detent);
+    }
   }
 
   void _onDragEnd(DragEndDetails d) {
-    const threshold = 100.0;
-    if (_showingAd) {
-      // Ad card: either direction just dismisses it (nothing is deleted).
-      if (_dragX.abs() > threshold) {
-        _dismissAd(toLeft: _dragX < 0);
-      } else {
-        setState(() {
-          _dragX = 0;
-          _dragY = 0;
-          _isDragging = false;
-        });
-      }
-      return;
-    }
-    if (_dragX < -threshold) {
-      _swipeLeft();
-    } else if (_dragX > threshold) {
-      _swipeRight();
+    if (_busy) return;
+    if (_drag.dx < -_threshold) {
+      _decide(delete: true);
+    } else if (_drag.dx > _threshold) {
+      _decide(delete: false);
     } else {
-      // Snap back
+      // Snap back.
+      final from = _drag;
       setState(() {
-        _dragX = 0;
-        _dragY = 0;
-        _isDragging = false;
+        _drag = Offset.zero;
+        _pastThreshold = false;
       });
+      _animate(from, Offset.zero);
     }
   }
+
+  // ── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
     final s = AppStrings.of(provider.languageCode);
+    final lang = provider.languageCode;
+    final avg = _isVideo ? kAvgVideoBytes : provider.avgPhotoBytes;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _exitSwipe();
+        if (!didPop) _finish();
       },
-      child: CelebrationOverlay(
-        key: _celebrationKey,
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            foregroundColor: Colors.white,
-            // Left-aligned + auto-shrinking: centred titles collide with the
-            // "N left" counter in languages with longer words (e.g. Polish).
-            centerTitle: false,
-            title: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(s.swipeMode,
-                  maxLines: 1,
-                  style: const TextStyle(color: Colors.white)),
-            ),
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _exitSwipe,
-            ),
-            actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 130),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                  '${_queue.length - _current} ${s.remaining}',
-                  maxLines: 1,
-                  style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600),
-                ),
+      child: Scaffold(
+        backgroundColor: Noir.bg,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+            child: Column(
+              children: [
+                NoirHeader(
+                  leading: NoirIconButton(
+                    icon: Icons.close_rounded,
+                    semanticLabel: s.finish,
+                    onPressed: _finish,
+                  ),
+                  title: s.oneByOne,
+                  subtitle: s.reviewed(formatCount(_reviewed, lang)),
+                  trailing: NoirIconButton(
+                    icon: Icons.undo_rounded,
+                    semanticLabel: s.undo,
+                    onPressed: _history.isEmpty ? null : _undo,
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
-        body: _done ? _buildDoneScreen(context, s) : _buildSwipeArea(context, s),
-      ),
-    ),
-    );
-  }
-
-  Widget _buildSwipeArea(BuildContext context, AppStrings s) {
-    final showAd = _showingAd && _nativeAd != null;
-    final asset = _queue[_current];
-
-    // Determine overlay opacity based on drag (photo cards only)
-    final deleteOpacity = (_dragX < 0 ? (-_dragX / 120).clamp(0.0, 1.0) : 0.0);
-    final keepOpacity = (_dragX > 0 ? (_dragX / 120).clamp(0.0, 1.0) : 0.0);
-
-    return Column(
-      children: [
-        // Card area
-        Expanded(
-          child: GestureDetector(
-            onHorizontalDragUpdate: _onDragUpdate,
-            onHorizontalDragEnd: _onDragEnd,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Next card (peek behind). Same padding as the front card so
-                // promoting it never jumps wider; scale gives the depth effect.
-                if (showAd || _current + 1 < _queue.length)
-                  Positioned.fill(
-                    child: Padding(
-                      padding: _cardPadding,
-                      child: Transform.scale(
-                        scale: _backCardScale,
-                        child: showAd
-                            ? _buildCard(asset, 0, 0, 0)
-                            : _buildCard(_queue[_current + 1], 0, 0, 0),
+                const SizedBox(height: 12),
+                AnimatedOpacity(
+                  opacity: _marked.isEmpty ? 0 : 1,
+                  duration: const Duration(milliseconds: 200),
+                  child: PendingPill(
+                    text: s.markedPending(formatCount(_marked.length, lang),
+                        formatBytes(_marked.length * avg, lang)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _done ? const SizedBox.shrink() : _buildStack(s),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: NoirButton.danger(
+                        big: true,
+                        icon: Icons.delete_outline_rounded,
+                        label: s.swipeDelete,
+                        onPressed: _done ? null : () => _decide(delete: true),
                       ),
                     ),
-                  ),
-
-                // Current card
-                AnimatedBuilder(
-                  animation: Listenable.merge([_flyOut, _promote]),
-                  builder: (context, _) {
-                    final extraX =
-                        _flyOut.isAnimating ? _flyOffset.value.dx * 300 : 0.0;
-                    final extraY =
-                        _flyOut.isAnimating ? _flyOffset.value.dy * 300 : 0.0;
-                    final rot = _flyOut.isAnimating
-                        ? _flyRotation.value
-                        : _dragX / 2000;
-
-                    return Transform(
-                      alignment: Alignment.center,
-                      transform: Matrix4.identity()
-                        ..translate(_dragX + extraX, _dragY + extraY)
-                        ..rotateZ(rot),
-                      child: Padding(
-                        padding: _cardPadding,
-                        child: ScaleTransition(
-                          scale: _promoteScale,
-                          child: showAd
-                              ? _buildAdCard(s)
-                              : _buildCard(asset, deleteOpacity, keepOpacity,
-                                  _dragX / 1000),
-                        ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: NoirButton.secondary(
+                        big: true,
+                        icon: Icons.check_rounded,
+                        label: s.swipeKeep,
+                        onPressed: _done ? null : () => _decide(delete: false),
                       ),
-                    );
-                  },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _isVideo ? s.confirmOnceNoteVideos : s.confirmOnceNote,
+                  textAlign: TextAlign.center,
+                  style: NoirText.caption.copyWith(fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
         ),
-
-        // Bottom buttons & instructions
-        _buildBottomBar(context, s),
-      ],
+      ),
     );
   }
 
-  /// The native ad rendered as a swipe card, clearly marked as sponsored.
-  Widget _buildAdCard(AppStrings s) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF15151C),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white12),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Column(
+  Widget _buildStack(AppStrings s) {
+    final showAd = _showingAd && _nativeAd != null;
+    // How far the drag (or fly-out) has gone, 0–1, to bring the next card
+    // forward as the current one leaves.
+    final t = (_offset.dx.abs() / (_threshold * 1.5)).clamp(0.0, 1.0);
+    final AssetEntity? behind = showAd
+        ? _items[_current]
+        : (_current + 1 < _items.length ? _items[_current + 1] : null);
+
+    return GestureDetector(
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white12,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  s.sponsored,
-                  style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5),
+          if (behind != null)
+            Opacity(
+              opacity: 0.5 + 0.5 * t,
+              child: Transform.translate(
+                offset: Offset(0, 14 * (1 - t)),
+                child: Transform.scale(
+                  scale: 0.95 + 0.05 * t,
+                  child: _cardFrame(_mediaCard(behind, s, front: false)),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minWidth: 280,
-                  minHeight: 320,
-                  maxHeight: 400,
-                ),
-                child: AdWidget(ad: _nativeAd!),
+            ),
+          Transform.translate(
+            offset: _offset,
+            child: Transform.rotate(
+              angle: _offset.dx / 2400,
+              child: _cardFrame(
+                showAd ? _adCard(s) : _mediaCard(_items[_current], s, front: true),
+                shadow: true,
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            s.adSwipeHint,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white54, fontSize: 15),
-          ),
+          if (_showHint && !showAd) _hintOverlay(s),
         ],
       ),
     );
   }
 
-  Widget _buildCard(AssetEntity asset, double deleteOpacity,
-      double keepOpacity, double rotation) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
+  Widget _cardFrame(Widget child, {bool shadow = false}) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Noir.rPhoto),
+        color: Noir.surface,
+        boxShadow: shadow
+            ? const [
+                BoxShadow(
+                    color: Color(0x47000000),
+                    blurRadius: 40,
+                    offset: Offset(0, 18)),
+              ]
+            : null,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    );
+  }
+
+  Widget _mediaCard(AssetEntity asset, AppStrings s, {required bool front}) {
+    final dx = front ? _offset.dx : 0.0;
+    final deleteOpacity = dx < 0 ? (-dx / 120).clamp(0.0, 1.0) : 0.0;
+    final keepOpacity = dx > 0 ? (dx / 120).clamp(0.0, 1.0) : 0.0;
+    final playing = front &&
+        _isVideo &&
+        _videoReady &&
+        _videoFor == asset.id &&
+        _videoCtrl != null;
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (playing)
+          FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: _videoCtrl!.value.size.width,
+              height: _videoCtrl!.value.size.height,
+              child: VideoPlayer(_videoCtrl!),
+            ),
+          )
+        else
           AssetEntityImage(
             asset,
             isOriginal: false,
             thumbnailSize: const ThumbnailSize(800, 1200),
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
-              color: Colors.grey.shade900,
-              child: const Icon(Icons.broken_image_outlined,
-                  color: Colors.grey, size: 64),
+              color: Noir.surface2,
+              child: Icon(
+                  _isVideo
+                      ? Icons.movie_outlined
+                      : Icons.broken_image_outlined,
+                  color: Noir.faint,
+                  size: 56),
             ),
           ),
-          // Delete overlay (red, swipe left)
-          if (deleteOpacity > 0)
-            Container(
-              color: AppTheme.danger.withOpacity(deleteOpacity * 0.6),
-              alignment: Alignment.topLeft,
-              padding: const EdgeInsets.all(28),
-              child: Transform.rotate(
-                angle: -0.3,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 10),
-                  decoration: BoxDecoration(
-                    border:
-                        Border.all(color: AppTheme.danger, width: 3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'DELETE',
-                    style: TextStyle(
-                      color: AppTheme.danger.withOpacity(deleteOpacity),
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          // Keep overlay (green, swipe right)
-          if (keepOpacity > 0)
-            Container(
-              color: AppTheme.success.withOpacity(keepOpacity * 0.6),
-              alignment: Alignment.topRight,
-              padding: const EdgeInsets.all(28),
-              child: Transform.rotate(
-                angle: 0.3,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 10),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: AppTheme.success, width: 3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'KEEP',
-                    style: TextStyle(
-                      color: AppTheme.success.withOpacity(keepOpacity),
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          // Date at bottom
+        if (deleteOpacity > 0)
+          _decisionOverlay(s.swipeDelete.toUpperCase(), Noir.danger,
+              deleteOpacity, Alignment.topRight, 0.25),
+        if (keepOpacity > 0)
+          _decisionOverlay(s.swipeKeep.toUpperCase(), Noir.accent, keepOpacity,
+              Alignment.topLeft, -0.25),
+        // Date chip, bottom-left.
+        Positioned(
+          left: 14,
+          bottom: 14,
+          child: _chip(s.shortDate(librarySortTime(asset))),
+        ),
+        if (_isVideo) ...[
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [Colors.black87, Colors.transparent],
-                ),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
-              child: Text(
-                _formatDate(librarySortTime(asset)),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500),
-              ),
-            ),
+            top: 14,
+            right: 14,
+            child: _chip(formatVideoDuration(asset.videoDuration),
+                icon: Icons.videocam_rounded),
           ),
+          if (front)
+            Positioned(
+              right: 14,
+              bottom: 10,
+              child: _holdToPlay(s),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _chip(String text, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: ShapeDecoration(
+        color: Colors.black.withValues(alpha: 0.55),
+        shape: const StadiumBorder(),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 15, color: Colors.white),
+            const SizedBox(width: 5),
+          ],
+          Text(text,
+              style: const TextStyle(
+                  fontFamily: NoirText.family,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white)),
         ],
       ),
     );
   }
 
-  Widget _buildBottomBar(BuildContext context, AppStrings s) {
+  Widget _holdToPlay(AppStrings s) {
+    final playing = _videoCtrl?.value.isPlaying ?? false;
+    return GestureDetector(
+      onTapDown: (_) => _play(),
+      onTapUp: (_) => _pause(),
+      onTapCancel: _pause,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: const ShapeDecoration(
+          color: Noir.accent,
+          shape: StadiumBorder(),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: Noir.onAccent, size: 20),
+            const SizedBox(width: 6),
+            Text(playing ? s.playing : s.holdToPlay,
+                style: const TextStyle(
+                    fontFamily: NoirText.family,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Noir.onAccent)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _decisionOverlay(String label, Color color, double opacity,
+      Alignment align, double angle) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(28, 16, 28, 36),
-      color: Colors.black,
-      child: Column(
-        children: [
-          Text(
-            s.recoverHint,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white54, fontSize: 16),
+      color: (color == Noir.accent ? Colors.black : color)
+          .withValues(alpha: opacity * 0.35),
+      alignment: align,
+      padding: const EdgeInsets.all(28),
+      child: Opacity(
+        opacity: opacity,
+        child: Transform.rotate(
+          angle: angle,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: color, width: 3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(label,
+                style: TextStyle(
+                    fontFamily: NoirText.family,
+                    color: color,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5)),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        ),
+      ),
+    );
+  }
+
+  Widget _hintOverlay(AppStrings s) {
+    return IgnorePointer(
+      child: Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: ShapeDecoration(
+            color: Colors.black.withValues(alpha: 0.7),
+            shape: const StadiumBorder(),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildActionBtn(
-                icon: Icons.delete_outline,
-                label: s.swipeDelete,
-                color: AppTheme.danger,
-                onTap: () =>
-                    _showingAd ? _dismissAd(toLeft: true) : _swipeLeft(),
-              ),
-              // Counter
-              Column(
-                children: [
-                  Text(
-                    '$_deletedCount',
+              const Icon(Icons.swipe_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(s.swipeFirstHint,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800),
-                  ),
-                  Text(s.deleted_noun,
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 16)),
-                ],
-              ),
-              _buildActionBtn(
-                icon: Icons.check_circle_outline,
-                label: s.swipeKeep,
-                color: AppTheme.success,
-                onTap: () =>
-                    _showingAd ? _dismissAd(toLeft: false) : _swipeRight(),
+                        fontFamily: NoirText.family,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// The native ad as a card, clearly marked as sponsored.
+  Widget _adCard(AppStrings s) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: const ShapeDecoration(
+                color: Noir.surface2,
+                shape: StadiumBorder(),
+              ),
+              child: Text(s.sponsored, style: NoirText.caption),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                    minWidth: 280, minHeight: 320, maxHeight: 400),
+                child: AdWidget(ad: _nativeAd!),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(s.adSwipeHint,
+              textAlign: TextAlign.center, style: NoirText.secondary),
         ],
       ),
     );
-  }
-
-  Widget _buildActionBtn({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 72,
-        height: 72,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color.withOpacity(0.15),
-          border: Border.all(color: color, width: 2.5),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 28),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDoneScreen(BuildContext context, AppStrings s) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('🎉', style: TextStyle(fontSize: 72)),
-            const SizedBox(height: 24),
-            Text(
-              s.swipeDone,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              s.deleted(_deletedCount, _formatBytes(_freedBytes)),
-              style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton(
-              onPressed: _exitSwipe,
-              child: Text(s.backHome),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime dt) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }
