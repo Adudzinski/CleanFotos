@@ -23,9 +23,6 @@ dependencies:
   # Persistence
   shared_preferences: ^2.3.2
 
-  # Celebration animation
-  confetti: ^0.7.0
-
   # Ads monetization
   google_mobile_ads: ^9.0.0
 

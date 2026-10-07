@@ -35,9 +35,6 @@ class AppProvider extends ChangeNotifier {
   /// know the library size, not how many similar groups exist.
   bool groupsLoaded = false;
 
-  /// True while photos are being loaded + grouped for a cleanup mode.
-  bool isLoadingGroups = false;
-
   /// True when the OS granted only partial access ("Selected photos" on
   /// Android 14+ / iOS limited library). The app then only sees a subset of
   /// the library — surfaced on the home screen so the user can fix it.
@@ -69,7 +66,6 @@ class AppProvider extends ChangeNotifier {
   int _measuredCount = 0;
   String languageCode = 'en';
   bool isPro = false;
-  bool onboardingSeen = false;
 
   /// Settings → Feedback. Both default on; mirrored into FeedbackService.
   bool soundsEnabled = true;
@@ -90,7 +86,6 @@ class AppProvider extends ChangeNotifier {
     // Default to the phone's language on first launch, else the saved choice.
     languageCode = prefs.getString('language_code') ?? _deviceLanguage();
     isPro = prefs.getBool('is_pro') ?? false;
-    onboardingSeen = prefs.getBool('onboarding_seen') ?? false;
     soundsEnabled = prefs.getBool('sounds_enabled') ?? true;
     hapticsEnabled = prefs.getBool('haptics_enabled') ?? true;
     FeedbackService.instance
@@ -140,57 +135,15 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> _setupReminders() async {
     await NotificationService.instance.requestPermissions();
+    await _scheduleReminders();
+  }
+
+  Future<void> _scheduleReminders() async {
     final s = AppStrings.of(languageCode);
     await NotificationService.instance.scheduleReminders(
       title: s.reminderTitle,
       body: s.reminderBody,
     );
-  }
-
-  Future<void> markOnboardingSeen() async {
-    if (onboardingSeen) return;
-    onboardingSeen = true;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarding_seen', true);
-    notifyListeners();
-  }
-
-  // ─── Resume cursors ─────────────────────────────────────────────────────
-  // Each swipe/review mode remembers the timestamp of the card the user was on,
-  // so it resumes there next time. (Since 1.3 Refresh no longer clears them.)
-  static const String kPhotoCursor = 'cursor_photo';
-  static const String kVideoCursor = 'cursor_video';
-  static const String kGroupCursor = 'cursor_group';
-
-  Future<int?> getCursor(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(key);
-  }
-
-  Future<void> setCursor(String key, int millis) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(key, millis);
-  }
-
-  /// Resume position for swipe/review modes — stores an asset or group id.
-  Future<String?> getCursorId(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('${key}_id');
-  }
-
-  Future<void> setCursorId(String key, String id) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('${key}_id', id);
-  }
-
-  Future<void> clearCursors() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(kPhotoCursor);
-    await prefs.remove(kVideoCursor);
-    await prefs.remove(kGroupCursor);
-    await prefs.remove('${kPhotoCursor}_id');
-    await prefs.remove('${kVideoCursor}_id');
-    await prefs.remove('${kGroupCursor}_id');
   }
 
   Future<void> setPro(bool value) async {
@@ -503,8 +456,6 @@ class AppProvider extends ChangeNotifier {
     await _freshen();
     if (groupsLoaded) return groups;
 
-    isLoadingGroups = true;
-    notifyListeners();
     try {
       // Reuse the already-scanned library if Picture Swipe (or the background
       // warm-up) loaded it — re-scanning 10k+ assets here was pure waste and
@@ -525,7 +476,6 @@ class AppProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('ensureGroups failed: $e');
     } finally {
-      isLoadingGroups = false;
       notifyListeners();
     }
     return groups;
@@ -869,12 +819,6 @@ class AppProvider extends ChangeNotifier {
     return gone;
   }
 
-  /// Skip a group (move to next without deleting).
-  void skipGroup(String groupId) {
-    groups = groups.where((g) => g.id != groupId).toList();
-    notifyListeners();
-  }
-
   // ─── Settings ────────────────────────────────────────────────────────────
 
   Future<void> setLanguage(String code) async {
@@ -882,8 +826,12 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('language_code', code);
     notifyListeners();
-    // Re-schedule the reminder so its text matches the new language.
-    await _setupReminders();
+    // Re-schedule the reminder so its text matches the new language — only
+    // if reminders exist. (This used to request notification permission on
+    // every language change, popping the system dialog over Settings.)
+    if (prefs.getBool(_kRemindersSetUp) ?? false) {
+      await _scheduleReminders();
+    }
   }
 
   Future<void> setSoundsEnabled(bool value) async {
@@ -900,18 +848,5 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('haptics_enabled', value);
-  }
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-
-  String get freedFormatted => _formatBytes(freedBytes);
-
-  static String _formatBytes(int bytes) {
-    if (bytes == 0) return '0 MB';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

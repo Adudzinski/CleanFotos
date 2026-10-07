@@ -1,5 +1,6 @@
 /// Locale-aware number and size formatting, written by hand because `intl`
 /// isn't a direct dependency (see pubspec.yaml).
+library;
 
 /// Languages that write "26.414" and "3,5" (dot thousands, comma decimals).
 const Set<String> _dotThousands = {'de', 'es', 'it', 'pt', 'pl'};

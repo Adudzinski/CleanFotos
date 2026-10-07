@@ -31,7 +31,7 @@ void main() {
     });
 
     test('rounding modes', () {
-      final almost100 = 104800000; // 99.95 MB
+      const almost100 = 104800000; // 99.95 MB
       expect(formatBytes(almost100), '100 MB');
       expect(formatBytes(almost100, 'en', ByteRounding.down), '99 MB');
       expect(formatBytes(57600, 'en', ByteRounding.up), '57 KB');
