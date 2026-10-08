@@ -970,7 +970,24 @@ class _HomeScreenState extends State<HomeScreen>
   /// "Left off at Sep 27, 2019" for a mode with a saved position.
   String? _leftOff(AppProvider provider, AppStrings s, CleanupMode m) {
     final at = provider.progressFor(m)?.at;
-    return at == null ? null : s.leftOffAt(s.reachedDate(at.time));
+    if (at == null) return null;
+    final DateTime? newest = switch (m) {
+      CleanupMode.photoSwipe => provider.allPhotos.isEmpty
+          ? null
+          : librarySortTime(provider.allPhotos.first),
+      CleanupMode.photoGroups =>
+        provider.groups.isEmpty ? null : _groupTime(provider.groups.first),
+      CleanupMode.videoSwipe => provider.allVideos.isEmpty
+          ? null
+          : librarySortTime(provider.allVideos.first),
+      CleanupMode.videoGroups => provider.videoGroups.isEmpty
+          ? null
+          : _groupTime(provider.videoGroups.first),
+    };
+    // Saved at the newest item = nothing to continue from (tapping wouldn't
+    // ask either), so don't claim the user "left off" there.
+    if (newest != null && !at.time.isBefore(newest)) return null;
+    return s.leftOffAt(s.reachedDate(at.time));
   }
 
   Widget _modeCard({
