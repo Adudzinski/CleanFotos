@@ -24,7 +24,7 @@ const String kContactEmail = 'contact@crocodata.net';
 
 /// Shown under About. Keep in step with `version:` in pubspec.yaml
 /// (package_info_plus isn't a dependency).
-const String kAppVersion = '1.3.0';
+const String kAppVersion = '1.4.0';
 
 /// Settings (REDESIGN_1.3_PLAN.md §5.7): Feedback, Progress, Language,
 /// Remove ads, About.

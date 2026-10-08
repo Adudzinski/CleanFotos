@@ -1,6 +1,8 @@
-# CleanFotos 1.3 "Noir" — Release Notes
+# CleanFotos 1.4 "Noir" — Release Notes
 
-Version: `1.3.0+20` (versionCode 20)
+Version: `1.4.0+21` (versionCode 21). App Store version name: **1.4**
+(the redesign was planned as "1.3"; App Store Connect already had a 1.3
+version, so it ships as 1.4).
 
 A brand-new look and a calmer, more honest cleanup flow. Built from
 `REDESIGN_1.3_PLAN.md`.
@@ -8,6 +10,10 @@ A brand-new look and a calmer, more honest cleanup flow. Built from
 ---
 
 ## App Store
+
+**All 7 languages** (name, subtitle, promotional text, description, What's
+New, keywords): see `APPSTORE_LISTING_1.4.md`, generated and length-checked
+by `tool/appstore_listing.py`. The English texts below are the same.
 
 ### What's New in This Version — 749 / 4000 chars
 
@@ -44,8 +50,17 @@ copy says "space you really free" (only confirmed deletions count), never
 
 ### Screenshots
 
-`assets/store/1.3/appstore_6.9/` (1320 × 2868) and
-`assets/store/1.3/appstore_6.5/` (1284 × 2778), six each, in upload order:
+Six per iPhone display class, in `assets/store/1.4/`, in upload order:
+
+| App Store Connect slot | Folder | Size |
+|---|---|---|
+| 6.9" | `appstore_6.9/` | 1320 × 2868 |
+| 6.5" | `appstore_6.5/` | 1284 × 2778 |
+| 6.3" | `appstore_6.3/` | 1206 × 2622 |
+| 6.1" | `appstore_6.1/` | 1179 × 2556 |
+
+Uploading the 6.9" set is normally enough (smaller iPhones get scaled
+copies); use the others when a slot asks for its own size.
 
 1. Swipe to keep or delete
 2. Bursts and retakes, side by side
@@ -80,9 +95,9 @@ A brand-new CleanFotos.
 
 ### Graphics
 
-- Phone screenshots: `assets/store/1.3/play_phone/` (1080 × 1920, 9:16 —
+- Phone screenshots: `assets/store/1.4/play_phone/` (1080 × 1920, 9:16 —
   Play caps the long side at 2× the short side), same six as above.
-- Feature graphic: `assets/store/1.3/play_feature_graphic.png` (1024 × 500).
+- Feature graphic: `assets/store/1.4/play_feature_graphic.png` (1024 × 500).
 - App icon unchanged (`assets/store/play_icon_512.png`).
 
 ---
@@ -146,7 +161,7 @@ A brand-new CleanFotos.
 
 ---
 
-## Known limits in 1.3
+## Known limits in 1.4
 - **iOS freed sizes are estimates** (~3.5 MB per photo, ~30 MB per video).
   photo_manager can only hand out an original on iOS by copying it into the
   app's cache, which for a batch of videos means gigabytes of writes before
@@ -159,7 +174,7 @@ A brand-new CleanFotos.
 ## Play upload package (prepared 2026-10-08)
 
 - **Bundle:** `build/app/outputs/bundle/release/app-release.aab` (61 MB)
-  - versionName `1.3.0`, versionCode `20`, package `com.crocodata.cleanpics`
+  - versionName `1.4.0`, versionCode `21`, package `com.crocodata.cleanpics`
   - Signed with the upload key: `CN=Crocodata, O=Crocodata, C=PL`,
     SHA-256 `B2:B9:3C:73:67:F7:48:EE:D2:07:84:BC:BB:A6:8A:55:BC:01:40:6E:23:47:B0:87:9B:8C:D3:11:C0:14:3C:69`
   - Rebuild after any change: `flutter build appbundle --release`
@@ -174,16 +189,16 @@ A brand-new CleanFotos.
   - *Data safety:* unchanged — no new data leaves the device (sounds,
     milestones and saved positions are stored locally).
 - **Store listing (Main store listing):** replace the screenshots with
-  `assets/store/1.3/play_phone/` and the feature graphic, and rename the
+  `assets/store/1.4/play_phone/` and the feature graphic, and rename the
   listing title to "CleanFotos" (still an open item).
 - Play may warn about missing native debug symbols / deobfuscation file —
   harmless (no R8 minification; Flutter's native libs ship stripped).
 
 ## Release checklist
 - [ ] QA on real devices (plan §7 list) — iPhone and Android 13+.
-- [x] New store screenshots (Noir) and feature graphic — `assets/store/1.3/`.
+- [x] New store screenshots (Noir) and feature graphic — `assets/store/1.4/`.
 - [ ] iOS: run Codemagic `ios-testflight` on `main` → check the log shows
-      `1.3.0` with a build number above the last TestFlight build.
+      `1.4.0` with a build number above the last TestFlight build.
 - [ ] App Store Connect: What's New + promotional text (above), the 6.9" and
       6.5" screenshots, and the **Marketing URL** `https://crocodata.net`.
 - [x] Android: release `.aab` built and verified (see Play upload package).

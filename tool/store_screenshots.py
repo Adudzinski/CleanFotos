@@ -1,8 +1,8 @@
-"""Builds the 1.3 store screenshots and Play feature graphic.
+"""Builds the 1.4 store screenshots and Play feature graphic.
 
 Input: raw emulator captures (1080x2400) in RAW_DIR, named as in SHOTS.
-Output: assets/store/1.3/{appstore_6.9,appstore_6.5,play_phone}/ and
-assets/store/1.3/play_feature_graphic.png
+Output: assets/store/1.4/{appstore_6.9,appstore_6.5,appstore_6.3,appstore_6.1,
+play_phone}/ and assets/store/1.4/play_feature_graphic.png
 
     python tool/store_screenshots.py <raw_dir>
 
@@ -16,7 +16,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FONT_DIR = os.path.join(ROOT, 'assets', 'fonts')
-OUT = os.path.join(ROOT, 'assets', 'store', '1.3')
+OUT = os.path.join(ROOT, 'assets', 'store', '1.4')
 LOGO = os.path.join(ROOT, 'assets', 'icon', 'icon_header.png')
 
 BG = (10, 10, 12)
@@ -38,9 +38,13 @@ SHOTS = [
 # Crop of the 1080x2400 capture: below the status bar, above the gesture bar.
 CROP = (0, 84, 1080, 2340)
 
+# App Store Connect sizes per iPhone display class (portrait):
+#   6.9": 1320x2868 · 6.5": 1284x2778 · 6.3": 1206x2622 · 6.1": 1179x2556
 TARGETS = {
     'appstore_6.9': (1320, 2868),
     'appstore_6.5': (1284, 2778),
+    'appstore_6.3': (1206, 2622),
+    'appstore_6.1': (1179, 2556),
     'play_phone': (1080, 1920),
 }
 
