@@ -1,36 +1,89 @@
 # CleanFotos 1.3 "Noir" — Release Notes
 
-Version: `1.3.0+20` · branch `noir-1.3`
+Version: `1.3.0+20` (versionCode 20)
 
 A brand-new look and a calmer, more honest cleanup flow. Built from
 `REDESIGN_1.3_PLAN.md`.
 
 ---
 
-## What's New (both stores — Play max 500 chars)
+## App Store
 
-**Recommended — 330 chars.** Accurate on both platforms: iOS 1.3 counts freed
-space from per-photo estimates, not measured files (see "Known limits").
-
-```
-A brand-new CleanFotos.
-• New look: calm, dark, and all about your photos.
-• Your newest photos now show up instantly — no more Refresh.
-• Clear buttons for every step, plus Undo.
-• Gentle sounds and haptics (switch them off in Settings).
-• Milestones that count only space you really freed — nothing is counted until you confirm.
-```
-
-**As written in the plan — 318 chars.** Only fully true on Android.
+### What's New in This Version — 749 / 4000 chars
 
 ```
 A brand-new CleanFotos.
-• New look: calm, dark, and all about your photos.
-• Your newest photos now show up instantly — no more Refresh.
-• Clear buttons for every step, plus Undo.
-• Gentle sounds and haptics (switch them off in Settings).
-• Milestones that count only real space freed, measured from your actual files.
+
+• A calm new design, built around your photos.
+• Your newest photos show up by themselves — and a Refresh button is there whenever you want to look again.
+• Pick up where you left off: each mode remembers your place, even after you close the app. Or start with the newest — your old place stays saved.
+• Swipe to keep or delete, with Undo.
+• Similar shots: tap the retakes you don't want, then move on with one tap — or pull past the end of the grid to the next group.
+• See the space you really freed, and reach milestones from 100 MB to 50 GB. Nothing is counted until you confirm.
+• Easier to read: text now follows your iPhone's text size, up to twice as large.
+• Gentle sounds and haptics — switch them off in Settings.
 ```
+
+### Promotional text — max 170 chars (editable any time, no review)
+
+**Option A — 157 chars** (recommended: names what people asked for)
+
+```
+New look, same quick cleanup: your newest photos appear by themselves, Undo while you swipe, and CleanFotos remembers where you left off — even back in 2019.
+```
+
+**Option B — 142 chars**
+
+```
+Clean up your library, calmly: swipe with Undo, tidy bursts side by side, pick up where you left off, and celebrate the space you really free.
+```
+
+Both are accurate on iOS too: freed space there is estimated per photo, so the
+copy says "space you really free" (only confirmed deletions count), never
+"measured".
+
+### Screenshots
+
+`assets/store/1.3/appstore_6.9/` (1320 × 2868) and
+`assets/store/1.3/appstore_6.5/` (1284 × 2778), six each, in upload order:
+
+1. Swipe to keep or delete
+2. Bursts and retakes, side by side
+3. See the space you really freed
+4. Clean up your library, calmly
+5. Pick up where you left off
+6. Milestones that keep you going
+
+Built by `tool/store_screenshots.py` from emulator captures of the real app
+(demo photos are generated, not stock). The Android status bar and gesture
+bar are cropped off, as Apple rejects other-platform chrome.
+
+---
+
+## Google Play
+
+### Release notes (en-US) — 411 / 500 chars
+
+```
+<en-US>
+A brand-new CleanFotos.
+• Calm new design, built around your photos.
+• Newest photos show up by themselves, plus a Refresh button.
+• Each mode remembers where you left off.
+• Swipe to keep or delete, with Undo.
+• Similar shots: tap, then Next — or pull to the next group.
+• Milestones for space you really freed.
+• Text grows with your phone's text size, up to 2x.
+• Gentle sounds and haptics (off in Settings).
+</en-US>
+```
+
+### Graphics
+
+- Phone screenshots: `assets/store/1.3/play_phone/` (1080 × 1920, 9:16 —
+  Play caps the long side at 2× the short side), same six as above.
+- Feature graphic: `assets/store/1.3/play_feature_graphic.png` (1024 × 500).
+- App icon unchanged (`assets/store/play_icon_512.png`).
 
 ---
 
@@ -60,7 +113,7 @@ A brand-new CleanFotos.
 ### Noir design
 - Dark-only theme, Geist font (bundled), new tokens and shared widgets.
 - New Home: freshness line, Photos/Videos tabs with counts, two mode cards
-  ("Similar shots/clips", "One by one"), next-milestone card.
+  ("Similar shots/clips", "Swipe"), next-milestone card.
 - No confetti, no coachmark tour, no idle hints.
 
 ### Modes
@@ -103,14 +156,37 @@ A brand-new CleanFotos.
 
 ---
 
+## Play upload package (prepared 2026-10-08)
+
+- **Bundle:** `build/app/outputs/bundle/release/app-release.aab` (61 MB)
+  - versionName `1.3.0`, versionCode `20`, package `com.crocodata.cleanpics`
+  - Signed with the upload key: `CN=Crocodata, O=Crocodata, C=PL`,
+    SHA-256 `B2:B9:3C:73:67:F7:48:EE:D2:07:84:BC:BB:A6:8A:55:BC:01:40:6E:23:47:B0:87:9B:8C:D3:11:C0:14:3C:69`
+  - Rebuild after any change: `flutter build appbundle --release`
+    (the `.aab` is not in git).
+- **Play Console → Production → Create new release:** upload the `.aab`,
+  paste the release notes above, review, roll out.
+- **App content checks for this release:**
+  - *Photo and video permissions:* the manifest now also declares
+    `READ_MEDIA_VISUAL_USER_SELECTED` (Android 14+ "Select photos"). The
+    existing declaration (core purpose: photo cleanup) still applies; if Play
+    asks, the use is the same.
+  - *Data safety:* unchanged — no new data leaves the device (sounds,
+    milestones and saved positions are stored locally).
+- **Store listing (Main store listing):** replace the screenshots with
+  `assets/store/1.3/play_phone/` and the feature graphic, and rename the
+  listing title to "CleanFotos" (still an open item).
+- Play may warn about missing native debug symbols / deobfuscation file —
+  harmless (no R8 minification; Flutter's native libs ship stripped).
+
 ## Release checklist
 - [ ] QA on real devices (plan §7 list) — iPhone and Android 13+.
-- [ ] New store screenshots (Noir): Home, One by one, Similar shots,
-      Finished with a milestone, Milestones.
-- [ ] iOS: push `noir-1.3` (or merge to `main`) → Codemagic `ios-testflight`
-      → check the log shows `1.3.0 (19)` or higher.
-- [ ] App Store Connect: set the **Marketing URL** to `https://crocodata.net`.
-- [ ] Android: `flutter build appbundle --release` → Play Console
-      (`build/app/outputs/bundle/release/app-release.aab`).
-- [ ] Play: rename the listing to "CleanFotos".
+- [x] New store screenshots (Noir) and feature graphic — `assets/store/1.3/`.
+- [ ] iOS: run Codemagic `ios-testflight` on `main` → check the log shows
+      `1.3.0` with a build number above the last TestFlight build.
+- [ ] App Store Connect: What's New + promotional text (above), the 6.9" and
+      6.5" screenshots, and the **Marketing URL** `https://crocodata.net`.
+- [x] Android: release `.aab` built and verified (see Play upload package).
+- [ ] Play Console: upload, release notes, screenshots, feature graphic,
+      rename the listing to "CleanFotos".
 - [ ] AdMob: rename the app from "CleanPics" (consent form title).
