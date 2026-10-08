@@ -1,6 +1,6 @@
 # CleanFotos 1.3 "Noir" — Release Notes
 
-Version: `1.3.0+19` · branch `noir-1.3`
+Version: `1.3.0+20` · branch `noir-1.3`
 
 A brand-new look and a calmer, more honest cleanup flow. Built from
 `REDESIGN_1.3_PLAN.md`.
