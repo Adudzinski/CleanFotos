@@ -28,6 +28,9 @@ void main() {
         s.freedInTotal('10'), s.reachedOn('Oct 4'), s.reached,
         s.aboutPhotos('70'), s.ofTier('28 MB', '100 MB'), s.progress,
         s.feedback, s.sounds, s.haptics,
+        s.refresh, s.leftOffAt('Sep 27, 2019'), s.resumeTitle,
+        s.continueFrom('Sep 27, 2019'), s.startNewest,
+        s.newSinceLastTime('12 photos'),
       ];
       for (final n in [0, 1, 2, 5, 12, 22, 112]) {
         all

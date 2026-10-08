@@ -248,38 +248,147 @@ class _HomeScreenState extends State<HomeScreen>
     _afterMode(provider, deletedBefore);
   }
 
+  /// Where to start a mode. "Keep going" passes [resume] and continues the
+  /// same kind of run. Otherwise, with a saved position further down, ask:
+  /// continue there, or start with the newest? Returns null if the user
+  /// dismissed the question.
+  Future<({int start, bool fromNewest})?> _pickStart<T>({
+    required List<T> items,
+    required CleanupMode mode,
+    required int Function(ResumePoint?) indexOf,
+    required DateTime Function(T) timeOf,
+    required String Function(int n) newWhat,
+    required AppProvider provider,
+    required AppStrings s,
+    ResumePoint? resume,
+    bool? fromNewest,
+  }) async {
+    if (resume != null) {
+      return (start: indexOf(resume), fromNewest: fromNewest ?? true);
+    }
+    final saved = provider.progressFor(mode);
+    final at = saved?.at;
+    final atIndex = at == null ? 0 : indexOf(at);
+    if (atIndex <= 0) return (start: 0, fromNewest: true);
+    final top = saved!.top;
+    final newCount = top == null
+        ? 0
+        : items.where((i) => timeOf(i).isAfter(top)).length;
+    final choice = await _askWhereToStart(
+      s,
+      date: s.reachedDate(at!.time),
+      newLine: newCount > 0 ? s.newSinceLastTime(newWhat(newCount)) : null,
+    );
+    if (choice == null) return null;
+    return choice
+        ? (start: atIndex, fromNewest: false)
+        : (start: 0, fromNewest: true);
+  }
+
+  /// "Continue from Sep 27, 2019" (true) / "Start with the newest" (false).
+  Future<bool?> _askWhereToStart(AppStrings s,
+      {required String date, String? newLine}) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(s.resumeTitle, style: NoirText.h2),
+              const SizedBox(height: 20),
+              NoirButton.primary(
+                icon: Icons.history_rounded,
+                label: s.continueFrom(date),
+                onPressed: () => Navigator.pop(sheetContext, true),
+              ),
+              const SizedBox(height: 12),
+              NoirButton.secondary(
+                icon: Icons.fiber_new_outlined,
+                label: s.startNewest,
+                onPressed: () => Navigator.pop(sheetContext, false),
+              ),
+              if (newLine != null) ...[
+                const SizedBox(height: 10),
+                Text(newLine,
+                    textAlign: TextAlign.center, style: NoirText.secondary),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static DateTime _groupTime(PhotoGroup g) =>
+      g.assets.map(librarySortTime).reduce((a, b) => a.isAfter(b) ? a : b);
+
   Future<void> _openPhotoSwipe(AppProvider provider, AppStrings s,
-      {ResumePoint? resume, int? deletedBefore}) async {
+      {ResumePoint? resume, bool? fromNewest, int? deletedBefore}) async {
     _showLoading();
     final photos = await provider.ensurePhotos();
     if (!mounted) return;
     Navigator.of(context).pop();
-    final start = _assetIndex(photos, resume);
-    if (photos.isEmpty || start >= photos.length) {
+    if (photos.isEmpty) return _nothingToReview(provider, s, deletedBefore);
+    final pick = await _pickStart<AssetEntity>(
+      items: photos,
+      mode: CleanupMode.photoSwipe,
+      indexOf: (r) => _assetIndex(photos, r),
+      timeOf: librarySortTime,
+      newWhat: (n) =>
+          s.photosCount(n, formatCount(n, provider.languageCode)),
+      provider: provider,
+      s: s,
+      resume: resume,
+      fromNewest: fromNewest,
+    );
+    if (pick == null || !mounted) return;
+    if (pick.start >= photos.length) {
       return _nothingToReview(provider, s, deletedBefore);
     }
     await _runMode(
       provider,
-      SwipeScreen(photos: photos, startIndex: start),
-      (r, d) => _openPhotoSwipe(provider, s, resume: r, deletedBefore: d),
+      SwipeScreen(
+          photos: photos, startIndex: pick.start, fromNewest: pick.fromNewest),
+      (r, d) => _openPhotoSwipe(provider, s,
+          resume: r, fromNewest: pick.fromNewest, deletedBefore: d),
       deletedBefore: deletedBefore,
     );
   }
 
   Future<void> _openPhotoGroups(AppProvider provider, AppStrings s,
-      {ResumePoint? resume, int? deletedBefore}) async {
+      {ResumePoint? resume, bool? fromNewest, int? deletedBefore}) async {
     _showLoading();
     final groups = await provider.ensureGroups();
     if (!mounted) return;
     Navigator.of(context).pop();
-    final start = _groupIndex(groups, resume);
-    if (groups.isEmpty || start >= groups.length) {
+    if (groups.isEmpty) return _nothingToReview(provider, s, deletedBefore);
+    final pick = await _pickStart<PhotoGroup>(
+      items: groups,
+      mode: CleanupMode.photoGroups,
+      indexOf: (r) => _groupIndex(groups, r),
+      timeOf: _groupTime,
+      newWhat: (n) =>
+          s.groupsCount(n, formatCount(n, provider.languageCode)),
+      provider: provider,
+      s: s,
+      resume: resume,
+      fromNewest: fromNewest,
+    );
+    if (pick == null || !mounted) return;
+    if (pick.start >= groups.length) {
       return _nothingToReview(provider, s, deletedBefore);
     }
     await _runMode(
       provider,
-      GroupReviewScreen(groups: groups, startIndex: start),
-      (r, d) => _openPhotoGroups(provider, s, resume: r, deletedBefore: d),
+      GroupReviewScreen(
+          groups: groups, startIndex: pick.start, fromNewest: pick.fromNewest),
+      (r, d) => _openPhotoGroups(provider, s,
+          resume: r, fromNewest: pick.fromNewest, deletedBefore: d),
       deletedBefore: deletedBefore,
     );
   }
@@ -298,7 +407,10 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _openVideoMode(AppProvider provider, AppStrings s,
-      {required bool grouped, ResumePoint? resume, int? deletedBefore}) async {
+      {required bool grouped,
+      ResumePoint? resume,
+      bool? fromNewest,
+      int? deletedBefore}) async {
     if (!await _ensureVideoAccess(provider, s)) return;
     if (!mounted) return;
     _showLoading();
@@ -321,27 +433,64 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     if (grouped) {
-      final start = _groupIndex(vGroups, resume);
-      if (vGroups.isEmpty || start >= vGroups.length) {
+      if (vGroups.isEmpty) return _nothingToReview(provider, s, deletedBefore);
+      final pick = await _pickStart<PhotoGroup>(
+        items: vGroups,
+        mode: CleanupMode.videoGroups,
+        indexOf: (r) => _groupIndex(vGroups, r),
+        timeOf: _groupTime,
+        newWhat: (n) =>
+            s.groupsCount(n, formatCount(n, provider.languageCode)),
+        provider: provider,
+        s: s,
+        resume: resume,
+        fromNewest: fromNewest,
+      );
+      if (pick == null || !mounted) return;
+      if (pick.start >= vGroups.length) {
         return _nothingToReview(provider, s, deletedBefore);
       }
       await _runMode(
         provider,
-        VideoGroupReviewScreen(groups: vGroups, startIndex: start),
+        VideoGroupReviewScreen(
+            groups: vGroups,
+            startIndex: pick.start,
+            fromNewest: pick.fromNewest),
         (r, d) => _openVideoMode(provider, s,
-            grouped: true, resume: r, deletedBefore: d),
+            grouped: true,
+            resume: r,
+            fromNewest: pick.fromNewest,
+            deletedBefore: d),
         deletedBefore: deletedBefore,
       );
     } else {
-      final start = _assetIndex(videos, resume);
-      if (start >= videos.length) {
+      final pick = await _pickStart<AssetEntity>(
+        items: videos,
+        mode: CleanupMode.videoSwipe,
+        indexOf: (r) => _assetIndex(videos, r),
+        timeOf: librarySortTime,
+        newWhat: (n) =>
+            s.videosCount(n, formatCount(n, provider.languageCode)),
+        provider: provider,
+        s: s,
+        resume: resume,
+        fromNewest: fromNewest,
+      );
+      if (pick == null || !mounted) return;
+      if (pick.start >= videos.length) {
         return _nothingToReview(provider, s, deletedBefore);
       }
       await _runMode(
         provider,
-        VideoSwipeScreen(videos: videos, startIndex: start),
+        VideoSwipeScreen(
+            videos: videos,
+            startIndex: pick.start,
+            fromNewest: pick.fromNewest),
         (r, d) => _openVideoMode(provider, s,
-            grouped: false, resume: r, deletedBefore: d),
+            grouped: false,
+            resume: r,
+            fromNewest: pick.fromNewest,
+            deletedBefore: d),
         deletedBefore: deletedBefore,
       );
     }
@@ -597,6 +746,8 @@ class _HomeScreenState extends State<HomeScreen>
                       thumbs: provider.groups.isNotEmpty
                           ? provider.groups.first.assets.take(3).toList()
                           : const [],
+                      leftOff:
+                          _leftOff(provider, s, CleanupMode.photoGroups),
                       onTap: () => _openPhotoGroups(provider, s),
                     ),
                     const SizedBox(height: Noir.gapS),
@@ -609,6 +760,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ? [provider.allPhotos.first]
                           : const [],
                       single: true,
+                      leftOff: _leftOff(provider, s, CleanupMode.photoSwipe),
                       onTap: () => _openPhotoSwipe(provider, s),
                     ),
                   ] else ...[
@@ -622,6 +774,8 @@ class _HomeScreenState extends State<HomeScreen>
                       thumbs: provider.videoGroups.isNotEmpty
                           ? provider.videoGroups.first.assets.take(3).toList()
                           : provider.allVideos.take(3).toList(),
+                      leftOff:
+                          _leftOff(provider, s, CleanupMode.videoGroups),
                       onTap: videoAccessDenied
                           ? () => _showVideoAccessDialog(provider, s)
                           : () => _openVideoMode(provider, s, grouped: true),
@@ -638,6 +792,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ? [provider.allVideos.first]
                           : const [],
                       single: true,
+                      leftOff: _leftOff(provider, s, CleanupMode.videoSwipe),
                       onTap: videoAccessDenied
                           ? () => _showVideoAccessDialog(provider, s)
                           : () => _openVideoMode(provider, s, grouped: false),
@@ -739,7 +894,46 @@ class _HomeScreenState extends State<HomeScreen>
           const SizedBox(width: 8),
           Expanded(child: Text(text, style: NoirText.meta.copyWith(
               fontWeight: FontWeight.w400))),
+          const SizedBox(width: 8),
+          // Visible on purpose: the library also refreshes by itself, but
+          // people want a button they can trust to "look again".
+          _refreshButton(provider, s),
         ],
+      ),
+    );
+  }
+
+  Widget _refreshButton(AppProvider provider, AppStrings s) {
+    final busy = provider.isRescanning;
+    return Semantics(
+      button: true,
+      enabled: !busy,
+      child: Material(
+        color: Noir.surface2,
+        shape: const StadiumBorder(side: BorderSide(color: Noir.line)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: busy
+              ? null
+              : () {
+                  FeedbackService.instance.play(Fx.tap);
+                  provider.refresh();
+                },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.refresh_rounded,
+                    size: 16, color: busy ? Noir.faint : Noir.text),
+                const SizedBox(width: 5),
+                Text(s.refresh,
+                    style: NoirText.caption
+                        .copyWith(color: busy ? Noir.faint : Noir.text)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -773,6 +967,12 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  /// "Left off at Sep 27, 2019" for a mode with a saved position.
+  String? _leftOff(AppProvider provider, AppStrings s, CleanupMode m) {
+    final at = provider.progressFor(m)?.at;
+    return at == null ? null : s.leftOffAt(s.reachedDate(at.time));
+  }
+
   Widget _modeCard({
     required String title,
     required String desc,
@@ -780,6 +980,7 @@ class _HomeScreenState extends State<HomeScreen>
     required List<AssetEntity> thumbs,
     required VoidCallback onTap,
     bool single = false,
+    String? leftOff,
   }) {
     return Semantics(
       button: true,
@@ -795,6 +996,21 @@ class _HomeScreenState extends State<HomeScreen>
                   Text(title, style: NoirText.h2),
                   const SizedBox(height: 6),
                   Text(desc, style: NoirText.secondary),
+                  if (leftOff != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.history_rounded,
+                            size: 16, color: Noir.accent),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(leftOff,
+                              style: NoirText.meta
+                                  .copyWith(color: Noir.accent)),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   Container(
                     padding:

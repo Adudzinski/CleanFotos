@@ -115,6 +115,21 @@ days — new photos never appeared until the user found Refresh. Now
 every iCloud sync batch, so automatic re-scans first compare a cheap
 fingerprint (count + newest id) and skip when nothing changed.
 
+### "Continue where I left off" never worked in 1.x (fixed in 1.3)
+1.0.9 added a resume-cursor API that nothing ever called: every session
+started at the newest photo of the (stale) cached list, which looked like a
+random start. 1.3 saves a position per mode (`progress_<mode>` prefs,
+`AppProvider.recordProgress`) after every decision / group change. Rules:
+a "Continue" run moves the point as you go; a "Start with the newest" run
+never moves it *up* (browsing this week's photos keeps the 2019 point) but
+records `top`, so photos newer than it show as "New since last time".
+Reaching the end clears the point. Covered by `test/progress_test.dart`.
+
+### Text size goes up to 2x
+`kMaxTextScale` in main.dart (was 1.4). Every screen was checked at 2x in
+Polish on a full-size and an iPhone-SE-height screen. Keep new layouts
+scrollable or flexible; never fix a height around text.
+
 ### Measuring file sizes on iOS copies the file
 photo_manager's `originFile`/`file` on iOS writes the original into the app's
 cache (`PHAssetResourceManager`). Measuring a batch of videos that way means

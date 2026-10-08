@@ -8,11 +8,13 @@ import 'group_review_screen.dart';
 class VideoGroupReviewScreen extends StatelessWidget {
   final List<PhotoGroup> groups;
   final int startIndex;
+  final bool fromNewest;
 
   const VideoGroupReviewScreen({
     super.key,
     required this.groups,
     this.startIndex = 0,
+    this.fromNewest = true,
   });
 
   @override
@@ -20,5 +22,6 @@ class VideoGroupReviewScreen extends StatelessWidget {
         groups: groups,
         startIndex: startIndex,
         kind: MediaKind.videos,
+        fromNewest: fromNewest,
       );
 }

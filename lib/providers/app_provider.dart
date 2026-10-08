@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
 import '../models/delete_result.dart';
 import '../models/milestone.dart';
+import '../models/progress.dart';
 import '../models/photo_group.dart';
 import '../services/ad_service.dart';
 import '../services/feedback_service.dart';
@@ -83,6 +84,7 @@ class AppProvider extends ChangeNotifier {
     _measuredBytes = prefs.getInt(_kMeasuredBytes) ?? 0;
     _measuredCount = prefs.getInt(_kMeasuredCount) ?? 0;
     await _loadMilestones(prefs);
+    _loadProgress(prefs);
     // Default to the phone's language on first launch, else the saved choice.
     languageCode = prefs.getString('language_code') ?? _deviceLanguage();
     isPro = prefs.getBool('is_pro') ?? false;
@@ -498,6 +500,62 @@ class AppProvider extends ChangeNotifier {
     }
     _registerChangeListener();
     await reloadLibrary(silent: false);
+  }
+
+  // ─── Saved position per mode ─────────────────────────────────────────────
+  //
+  // Each mode remembers where the user is, across launches. (1.x had a
+  // "resume cursor" API that nothing ever called, so every session started
+  // at the newest photo of a possibly stale list.)
+
+  final Map<CleanupMode, SavedProgress> _progress = {};
+
+  static String _progressKey(CleanupMode m) => 'progress_${m.name}';
+
+  void _loadProgress(SharedPreferences prefs) {
+    for (final m in CleanupMode.values) {
+      final raw = prefs.getString(_progressKey(m));
+      if (raw == null) continue;
+      try {
+        final p = SavedProgress.fromJson(jsonDecode(raw));
+        if (p != null) _progress[m] = p;
+      } catch (_) {}
+    }
+  }
+
+  SavedProgress? progressFor(CleanupMode m) => _progress[m];
+
+  /// Record where the user is in mode [m]. [next] is the first item not yet
+  /// reviewed, or null when they reached the end.
+  ///
+  /// [fromNewest] runs (started at the newest item) never move the saved
+  /// point *up*: browsing this week's photos must not throw away the 2019
+  /// position. They do pass [top], the newest item's date, so photos that
+  /// arrive later count as "new since last time".
+  Future<void> recordProgress(
+    CleanupMode m,
+    ResumePoint? next, {
+    required bool fromNewest,
+    DateTime? top,
+  }) async {
+    final old = _progress[m];
+    ResumePoint? at;
+    if (next == null) {
+      at = null; // reviewed to the end
+    } else if (fromNewest &&
+        old?.at != null &&
+        next.time.isAfter(old!.at!.time)) {
+      at = old.at; // still above the deeper saved point — keep it
+    } else {
+      at = next;
+    }
+    DateTime? newTop = old?.top;
+    if (top != null && (newTop == null || top.isAfter(newTop))) newTop = top;
+    final p = SavedProgress(at: at, top: newTop);
+    _progress[m] = p;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_progressKey(m), jsonEncode(p.toJson()));
   }
 
   // ─── Milestones ───────────────────────────────────────────────────────────

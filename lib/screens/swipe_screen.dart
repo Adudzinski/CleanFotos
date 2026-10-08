@@ -32,11 +32,16 @@ class SwipeScreen extends StatefulWidget {
   final int startIndex;
   final MediaKind kind;
 
+  /// Started at the newest item (rather than "Continue from …"); see
+  /// AppProvider.recordProgress.
+  final bool fromNewest;
+
   const SwipeScreen({
     super.key,
     required this.photos,
     this.startIndex = 0,
     this.kind = MediaKind.photos,
+    this.fromNewest = true,
   });
 
   @override
@@ -60,6 +65,26 @@ class _SwipeScreenState extends State<SwipeScreen>
   late int _current = widget.startIndex.clamp(0, widget.photos.length);
 
   bool get _isVideo => widget.kind == MediaKind.videos;
+  CleanupMode get _mode =>
+      _isVideo ? CleanupMode.videoSwipe : CleanupMode.photoSwipe;
+
+  ResumePoint? get _here => _done
+      ? null
+      : ResumePoint(
+          assetId: _items[_current].id,
+          time: librarySortTime(_items[_current]));
+
+  /// Save the position so the user can continue here next time — even after
+  /// closing the app.
+  void _record() {
+    if (_items.isEmpty) return;
+    unawaited(_provider.recordProgress(
+      _mode,
+      _here,
+      fromNewest: widget.fromNewest,
+      top: widget.fromNewest ? librarySortTime(_items.first) : null,
+    ));
+  }
   bool get _done => _current >= _items.length;
 
   /// Ids marked this session (also in the provider's persisted queue).
@@ -292,6 +317,7 @@ class _SwipeScreenState extends State<SwipeScreen>
       }
     });
     _busy = false;
+    _record();
     _prepareVideo();
     if (_done) _finish();
   }
@@ -315,6 +341,7 @@ class _SwipeScreenState extends State<SwipeScreen>
       _drag = Offset.zero;
       _pastThreshold = false;
     });
+    _record();
     _prepareVideo();
     // Slide the card back in from the side it left.
     await _animate(Offset((d.deleted ? -1.4 : 1.4) * width, 40), Offset.zero);
@@ -325,11 +352,7 @@ class _SwipeScreenState extends State<SwipeScreen>
     if (_finishing) return;
     _finishing = true;
     _pause();
-    final resume = _done
-        ? null
-        : ResumePoint(
-            assetId: _items[_current].id,
-            time: librarySortTime(_items[_current]));
+    final resume = _here;
     await finishSession(context,
         provider: _provider, kind: widget.kind, resume: resume);
     // Still here (e.g. the route wasn't replaced) — allow another try.

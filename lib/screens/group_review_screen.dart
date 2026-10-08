@@ -30,11 +30,16 @@ class GroupReviewScreen extends StatefulWidget {
   final int startIndex;
   final MediaKind kind;
 
+  /// Started at the newest group (rather than "Continue from …"); see
+  /// AppProvider.recordProgress.
+  final bool fromNewest;
+
   const GroupReviewScreen({
     super.key,
     required this.groups,
     this.startIndex = 0,
     this.kind = MediaKind.photos,
+    this.fromNewest = true,
   });
 
   @override
@@ -51,6 +56,25 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
   bool _finishing = false;
 
   bool get _isVideo => widget.kind == MediaKind.videos;
+  CleanupMode get _mode =>
+      _isVideo ? CleanupMode.videoGroups : CleanupMode.photoGroups;
+
+  static DateTime _newest(PhotoGroup g) =>
+      g.assets.map(librarySortTime).reduce((a, b) => a.isAfter(b) ? a : b);
+
+  static ResumePoint _pointFor(PhotoGroup g) =>
+      ResumePoint(assetId: g.assets.first.id, time: _newest(g));
+
+  /// Save the position (the group at [index], or "done" past the end) so the
+  /// user can continue here next time — even after closing the app.
+  void _record(int index) {
+    unawaited(_provider.recordProgress(
+      _mode,
+      index < _groups.length ? _pointFor(_groups[index]) : null,
+      fromNewest: widget.fromNewest,
+      top: widget.fromNewest ? _newest(_groups.first) : null,
+    ));
+  }
   PhotoGroup get _group => _groups[_index];
   bool get _isLast => _index >= _groups.length - 1;
 
@@ -148,6 +172,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       FeedbackService.instance.play(Fx.groupKeep);
     }
     if (_isLast) {
+      _record(_groups.length);
       await _finish(resume: null);
       return;
     }
@@ -155,6 +180,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       _index++;
       _loadGroup();
     });
+    _record(_index);
   }
 
   Future<void> _previous() async {
@@ -166,6 +192,7 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
       _index--;
       _loadGroup();
     });
+    _record(_index);
   }
 
   /// Turn a pull past either end of the grid into group navigation — past
@@ -218,9 +245,8 @@ class _GroupReviewScreenState extends State<GroupReviewScreen> {
     if (_finishing) return;
     await _stopPlay();
     _queueSelected();
-    final first = _group.assets.first;
-    await _finish(
-        resume: ResumePoint(assetId: first.id, time: librarySortTime(first)));
+    _record(_index);
+    await _finish(resume: _pointFor(_group));
   }
 
   Future<void> _finish({required ResumePoint? resume}) async {

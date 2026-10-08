@@ -8,11 +8,13 @@ import 'swipe_screen.dart';
 class VideoSwipeScreen extends StatelessWidget {
   final List<AssetEntity> videos;
   final int startIndex;
+  final bool fromNewest;
 
   const VideoSwipeScreen({
     super.key,
     required this.videos,
     this.startIndex = 0,
+    this.fromNewest = true,
   });
 
   @override
@@ -20,5 +22,6 @@ class VideoSwipeScreen extends StatelessWidget {
         photos: videos,
         startIndex: startIndex,
         kind: MediaKind.videos,
+        fromNewest: fromNewest,
       );
 }

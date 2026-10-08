@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
 import '../models/delete_result.dart';
+import '../models/progress.dart';
 import '../providers/app_provider.dart';
 import 'session_summary_screen.dart';
 
+export '../models/progress.dart';
+
 /// What the user picked on the Finished screen.
 enum SummaryChoice { keepGoing, home }
-
-/// Where "Keep going" re-enters a mode: the first item the user hadn't
-/// reached yet. The library may have been re-scanned in between, so Home
-/// looks the asset up by id and falls back to its date.
-class ResumePoint {
-  final String assetId;
-  final DateTime time;
-  const ResumePoint({required this.assetId, required this.time});
-}
 
 /// A mode's route result.
 ///

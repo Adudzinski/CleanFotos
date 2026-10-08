@@ -36,10 +36,22 @@ A brand-new CleanFotos.
 
 ## What actually changed
 
+### Pick up where you left off
+- Each mode remembers your position, even after closing the app. The card
+  says "Left off at Sep 27, 2019"; tapping it asks: continue there, or start
+  with the newest ("New since last time: 12 photos"). Looking at new photos
+  never loses your old position. (1.x had the code for this, but it was
+  never connected — every session started at the top.)
+
+### Bigger text for people who need it
+- Text now grows up to 2x with the phone's text-size setting (was capped at
+  1.4x); every screen was checked at 2x.
+
 ### Newest photos appear by themselves (was the #1 complaint)
 - The library is re-scanned in the background when it changes (photo_manager
   change notifications, debounced 1.5 s) and on resume after 60 s. No
-  spinner, no Refresh button; pull down on Home as a hidden fallback.
+  spinner. A **Refresh** button next to "Up to date" (and pull-down) is
+  there for when you want to look again yourself.
 - Automatic re-scans first compare a cheap fingerprint (photo count + newest
   photo) so iCloud sync churn doesn't trigger full scans.
 - Re-scans wait while a cleanup mode is open or a deletion runs.

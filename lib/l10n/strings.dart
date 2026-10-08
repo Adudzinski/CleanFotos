@@ -114,6 +114,12 @@ class AppStrings {
   String get swipePhotosDesc => 'Every photo, newest first.';
   String get swipeVideosDesc => 'Every video, newest first. Hold to play.';
   String get findingGroups => 'Finding groups…';
+  String get refresh => 'Refresh';
+  String leftOffAt(String date) => 'Left off at $date';
+  String get resumeTitle => 'Pick up where you left off?';
+  String continueFrom(String date) => 'Continue from $date';
+  String get startNewest => 'Start with the newest';
+  String newSinceLastTime(String what) => 'New since last time: $what';
   String get allowAccess => 'Allow access';
   String get selectMorePhotos => 'Select more photos';
   String get limitedAccessBodyIos =>
@@ -239,6 +245,12 @@ class _EnglishStrings extends AppStrings {
 // ─── Spanish ──────────────────────────────────────────────────────────────────
 class _SpanishStrings extends AppStrings {
   const _SpanishStrings() : super._('es');
+  @override String get refresh => 'Actualizar';
+  @override String leftOffAt(String date) => 'Te quedaste en el $date';
+  @override String get resumeTitle => '¿Seguir donde lo dejaste?';
+  @override String continueFrom(String date) => 'Seguir desde el $date';
+  @override String get startNewest => 'Empezar por lo más reciente';
+  @override String newSinceLastTime(String what) => 'Novedades desde la última vez: $what';
 
   // ── 1.3 Noir ──
   @override String get homeTitle => 'Limpia tu galería';
@@ -376,6 +388,12 @@ class _SpanishStrings extends AppStrings {
 // ─── German ───────────────────────────────────────────────────────────────────
 class _GermanStrings extends AppStrings {
   const _GermanStrings() : super._('de');
+  @override String get refresh => 'Aktualisieren';
+  @override String leftOffAt(String date) => 'Zuletzt bei $date';
+  @override String get resumeTitle => 'Dort weitermachen, wo du aufgehört hast?';
+  @override String continueFrom(String date) => 'Weiter ab $date';
+  @override String get startNewest => 'Mit den neuesten beginnen';
+  @override String newSinceLastTime(String what) => 'Neu seit dem letzten Mal: $what';
 
   // ── 1.3 Noir ──
   @override String get homeTitle => 'Räume deine Mediathek auf';
@@ -507,6 +525,12 @@ class _GermanStrings extends AppStrings {
 // ─── French ───────────────────────────────────────────────────────────────────
 class _FrenchStrings extends AppStrings {
   const _FrenchStrings() : super._('fr');
+  @override String get refresh => 'Actualiser';
+  @override String leftOffAt(String date) => 'Arrêté au $date';
+  @override String get resumeTitle => 'Reprendre là où vous en étiez ?';
+  @override String continueFrom(String date) => 'Reprendre au $date';
+  @override String get startNewest => 'Commencer par les plus récentes';
+  @override String newSinceLastTime(String what) => 'Nouveau depuis la dernière fois : $what';
 
   // ── 1.3 Noir ──
   @override String get homeTitle => 'Faites le tri dans votre photothèque';
@@ -644,6 +668,12 @@ class _FrenchStrings extends AppStrings {
 // ─── Portuguese ───────────────────────────────────────────────────────────────
 class _PortugueseStrings extends AppStrings {
   const _PortugueseStrings() : super._('pt');
+  @override String get refresh => 'Atualizar';
+  @override String leftOffAt(String date) => 'Parou em $date';
+  @override String get resumeTitle => 'Continuar de onde você parou?';
+  @override String continueFrom(String date) => 'Continuar de $date';
+  @override String get startNewest => 'Começar pelo mais recente';
+  @override String newSinceLastTime(String what) => 'Novidades desde a última vez: $what';
 
   // ── 1.3 Noir ──
   @override String get homeTitle => 'Organize sua galeria';
@@ -781,6 +811,12 @@ class _PortugueseStrings extends AppStrings {
 // ─── Italian ──────────────────────────────────────────────────────────────────
 class _ItalianStrings extends AppStrings {
   const _ItalianStrings() : super._('it');
+  @override String get refresh => 'Aggiorna';
+  @override String leftOffAt(String date) => 'Interrotto al $date';
+  @override String get resumeTitle => 'Riprendere da dove avevi lasciato?';
+  @override String continueFrom(String date) => 'Riprendi dal $date';
+  @override String get startNewest => 'Inizia dal più recente';
+  @override String newSinceLastTime(String what) => 'Novità dall’ultima volta: $what';
 
   // ── 1.3 Noir ──
   @override String get homeTitle => 'Fai pulizia nella libreria';
@@ -918,6 +954,12 @@ class _ItalianStrings extends AppStrings {
 // ─── Polish ─────────────────────────────────────────────────────────────────
 class _PolishStrings extends AppStrings {
   const _PolishStrings() : super._('pl');
+  @override String get refresh => 'Odśwież';
+  @override String leftOffAt(String date) => 'Ostatnio: $date';
+  @override String get resumeTitle => 'Kontynuować od miejsca, w którym przerwano?';
+  @override String continueFrom(String date) => 'Kontynuuj od $date';
+  @override String get startNewest => 'Zacznij od najnowszych';
+  @override String newSinceLastTime(String what) => 'Nowe od ostatniego razu: $what';
 
   // ── 1.3 Noir ──
   /// Polish plural: 1 → one; 2–4 (but not 12–14) → few; otherwise many.
